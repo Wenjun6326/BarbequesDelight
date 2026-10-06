@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "#c:foods/bread",
+    "#c:foods/skewers",
+    "#c:foods/skewers",
+    "farmersdelight:fried_egg"
+  ],
+  "result": {
+    "id": "barbequesdelight:kebab_sandwich"
+  }
+}

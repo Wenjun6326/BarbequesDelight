@@ -1,0 +1,11 @@
+{
+  "type": "barbequesdelight:skewering",
+  "ingredients": [
+    "minecraft:potato",
+    "farmersdelight:bacon"
+  ],
+  "result": {
+    "id": "barbequesdelight:potato_skewer"
+  },
+  "count": 2
+}

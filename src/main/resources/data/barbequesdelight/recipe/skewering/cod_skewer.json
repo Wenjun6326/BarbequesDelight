@@ -1,0 +1,11 @@
+{
+  "type": "barbequesdelight:skewering",
+  "ingredients": [
+    "farmersdelight:cod_slice",
+    "#c:crops/tomato"
+  ],
+  "result": {
+    "id": "barbequesdelight:cod_skewer"
+  },
+  "count": 2
+}

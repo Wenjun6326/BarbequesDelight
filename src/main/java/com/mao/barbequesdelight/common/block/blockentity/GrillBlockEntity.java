@@ -1,81 +1,108 @@
 package com.mao.barbequesdelight.common.block.blockentity;
 
 import com.mao.barbequesdelight.common.recipe.GrillingRecipe;
+import com.mao.barbequesdelight.common.util.BBQDRecipesHelper;
 import com.mao.barbequesdelight.registry.BBQDEntityTypes;
 import com.mao.barbequesdelight.registry.BBQDItems;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.HorizontalFacingBlock;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.inventory.Inventories;
-import net.minecraft.inventory.Inventory;
-import net.minecraft.inventory.SimpleInventory;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
-import net.minecraft.network.listener.ClientPlayPacketListener;
-import net.minecraft.network.packet.Packet;
-import net.minecraft.network.packet.s2c.play.BlockEntityUpdateS2CPacket;
-import net.minecraft.particle.ParticleTypes;
-import net.minecraft.recipe.CampfireCookingRecipe;
-import net.minecraft.recipe.RecipeType;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.collection.DefaultedList;
-import net.minecraft.util.math.*;
-import net.minecraft.util.math.random.Random;
-import net.minecraft.world.World;
+import com.mao.barbequesdelight.registry.BBQDRecipes;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.NonNullList;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.ContainerHelper;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.world.item.crafting.RecipeManager;
+import net.minecraft.world.item.crafting.RecipeType;
+import net.minecraft.world.item.crafting.SingleRecipeInput;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.HorizontalDirectionalBlock;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.util.Mth;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.world.level.storage.ValueOutput;
+import org.jetbrains.annotations.Nullable;
+import org.joml.Vector2f;
 import vectorwing.farmersdelight.common.block.entity.HeatableBlockEntity;
+import vectorwing.farmersdelight.common.block.entity.SyncedBlockEntity;
 import vectorwing.farmersdelight.common.registry.ModParticleTypes;
 
 import java.util.List;
 import java.util.Optional;
 
-public class GrillBlockEntity extends BlockEntity implements BlockEntityInv, HeatableBlockEntity {
-    protected final DefaultedList<ItemStack> items = DefaultedList.ofSize(2, ItemStack.EMPTY);
+/**
+ * The grill: two independent halves, each holding one item that cooks while the block is
+ * heated. An item that reaches its full cooking time without being flipped becomes
+ * {@code burnt_food}; flipping rewinds progress to the halfway point.
+ */
+public class GrillBlockEntity extends SyncedBlockEntity implements BlockEntityInv, HeatableBlockEntity {
+    protected final NonNullList<ItemStack> items = NonNullList.withSize(2, ItemStack.EMPTY);
     public final int[] grillingTimes;
     protected final int[] grillingTimesTotal;
     public final boolean[] flipped;
 
+    // NOTE: the tag names are intentionally "swapped" relative to their meaning. The 1.20.1
+    // release wrote progress under "CookingTotalTimes" and targets under "CookingTimes";
+    // keeping the literals preserves save compatibility with existing worlds.
     private static final String TAG_KEY_COOKING_TOTAL_TIMES = "CookingTimes";
     private static final String TAG_KEY_COOKING_TIMES = "CookingTotalTimes";
+    private static final String TAG_FLIPPED = "Flipped";
 
     public GrillBlockEntity(BlockPos pos, BlockState state) {
-        super(BBQDEntityTypes.GRILL, pos, state);
+        this(BBQDEntityTypes.GRILL, pos, state);
+    }
+
+    public GrillBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
+        super(type, pos, state);
         this.grillingTimes = new int[2];
         this.grillingTimesTotal = new int[2];
         this.flipped = new boolean[2];
     }
 
-    public void setBarbecuing(int i, int time){
+    public void setBarbecuing(int i, int time) {
         this.grillingTimes[i] = 0;
         this.grillingTimesTotal[i] = time;
         this.setFlipped(i, false);
         inventoryChanged();
     }
 
-    protected void barbecuing(){
-        boolean flag = false;
+    protected void barbecuing() {
         for (int i = 0; i < items.size(); ++i) {
             ItemStack stack = items.get(i);
-            if (!stack.isEmpty()){
-                ++grillingTimes[i];
-                if (grillingTimes[i] == grillingTimesTotal[i]){
-                    if (world != null){
-                        Inventory inventory = new SimpleInventory(stack);
+            if (stack.isEmpty()) {
+                continue;
+            }
 
-                        ItemStack campfire = world.getRecipeManager().getAllMatches(RecipeType.CAMPFIRE_COOKING, inventory, world).stream().map(recipe -> recipe.craft(inventory, world.getRegistryManager())).findAny().orElse(stack);
-                        ItemStack result = world.getRecipeManager().getAllMatches(GrillingRecipe.Type.INSTANCE, inventory, world).stream().map(recipe -> recipe.craft(inventory, world.getRegistryManager())).findAny().orElse(campfire);
+            ++grillingTimes[i];
+            boolean flag = false;
 
-                        this.setStack(i, getFlipped(i) ? result : BBQDItems.BURNT_FOOD.getDefaultStack());
-                        flag = true;
-                    }
-                } else if (grillingTimes[i] == ( grillingTimesTotal[i] * 2)) {
-                    this.setStack(i, BBQDItems.BURNT_FOOD.getDefaultStack());
+            if (grillingTimes[i] == grillingTimesTotal[i]) {
+                Level level = this.getLevel();
+                if (level != null) {
+                    SingleRecipeInput input = new SingleRecipeInput(stack);
+
+                    // A grilling recipe wins; otherwise fall back to a vanilla campfire recipe.
+                    ItemStack campfire = ((net.minecraft.server.level.ServerLevel) level).recipeAccess()
+                            .getRecipeFor(RecipeType.CAMPFIRE_COOKING, input, level)
+                            .map(holder -> holder.value().assemble(input))
+                            .orElse(stack);
+
+                    ItemStack result = ((net.minecraft.server.level.ServerLevel) level).recipeAccess()
+                            .getRecipeFor(BBQDRecipes.GRILLING_TYPE, input, level)
+                            .map(holder -> holder.value().assemble(input))
+                            .orElse(campfire);
+
+                    this.setItem(i, getFlipped(i) ? result : BBQDItems.BURNT_FOOD.getDefaultInstance());
                     flag = true;
                 }
+            } else if (grillingTimes[i] == grillingTimesTotal[i] * 2) {
+                this.setItem(i, BBQDItems.BURNT_FOOD.getDefaultInstance());
+                flag = true;
             }
-            if (flag){
+
+            if (flag) {
                 inventoryChanged();
             }
         }
@@ -86,16 +113,16 @@ public class GrillBlockEntity extends BlockEntity implements BlockEntityInv, Hea
         for (int i = 0; i < items.size(); ++i) {
             if (grillingTimes[i] > 0) {
                 flag = true;
-                grillingTimes[i] = MathHelper.clamp(grillingTimes[i] - 2, 0, grillingTimesTotal[i]);
+                grillingTimes[i] = Mth.clamp(grillingTimes[i] - 2, 0, grillingTimesTotal[i]);
             }
         }
-        if (flag){
-            markDirty();
+        if (flag) {
+            setChanged();
         }
     }
 
-    public boolean flip(int i){
-        if (canFlip(i)){
+    public boolean flip(int i) {
+        if (canFlip(i)) {
             setFlipped(i, true);
             this.grillingTimes[i] = (this.grillingTimesTotal[i] / 2);
             return true;
@@ -103,33 +130,35 @@ public class GrillBlockEntity extends BlockEntity implements BlockEntityInv, Hea
         return false;
     }
 
-    public void setFlipped(int i, boolean flipped){
-        this.flipped[i] = flipped;
+    public void setFlipped(int i, boolean value) {
+        this.flipped[i] = value;
         inventoryChanged();
-        writeFlipped(new NbtCompound());
-        sendUpdatePacket(this);
     }
 
     public boolean getFlipped(int i) {
         return flipped[i];
     }
 
-    public boolean canFlip(int i){
-        return isBarbecuing() && grillingTimes[i] >= (grillingTimesTotal[i] / 2) && !getFlipped(i) && !world.isClient();
+    public boolean canFlip(int i) {
+        Level level = this.getLevel();
+        return isBarbecuing()
+                && grillingTimes[i] >= (grillingTimesTotal[i] / 2)
+                && !getFlipped(i)
+                && level != null && !level.isClientSide();
     }
 
-    public static void tick(World world, BlockPos blockPos, BlockState blockState, GrillBlockEntity grill) {
-        if (grill.isHeated()){
+    public static void tick(Level world, BlockPos blockPos, BlockState blockState, GrillBlockEntity grill) {
+        if (grill.isHeated()) {
             grill.barbecuing();
-        }else {
+        } else {
             grill.fadeBarbecuing();
         }
     }
 
-    public static void animationTick(World world, BlockPos pos, BlockState blockState, GrillBlockEntity grill){
-        if (grill.isBarbecuing()){
+    public static void animationTick(Level world, BlockPos pos, BlockState blockState, GrillBlockEntity grill) {
+        if (grill.isBarbecuing()) {
             grill.addParticles();
-            Random random = world.random;
+            var random = world.getRandom();
             if (random.nextFloat() < 0.2F) {
                 double x = (double) pos.getX() + 0.5D + (random.nextDouble() * 0.4D - 0.2D);
                 double y = (double) pos.getY() + 1.1D;
@@ -141,129 +170,118 @@ public class GrillBlockEntity extends BlockEntity implements BlockEntityInv, Hea
     }
 
     public boolean isHeated() {
-        return world != null && this.isHeated(this.world, this.pos);
+        Level level = this.getLevel();
+        return level != null && this.isHeated(level, this.getBlockPos());
     }
 
-    public boolean isBarbecuing(){
-        return world != null && isHeated() && !getStack(getStack(0).isEmpty() ? 1 : 0).isEmpty();
+    public boolean isBarbecuing() {
+        if (this.getLevel() == null || !isHeated()) {
+            return false;
+        }
+        return !getItem(getItem(0).isEmpty() ? 1 : 0).isEmpty();
     }
 
     public Optional<GrillingRecipe> findMatchingRecipe(ItemStack itemStack) {
-        return this.world != null && this.items.stream().anyMatch(ItemStack::isEmpty) ? this.world.getRecipeManager().getFirstMatch(GrillingRecipe.Type.INSTANCE, new SimpleInventory(itemStack), this.world) : Optional.empty();
+        Level level = this.getLevel();
+        if (level == null || this.items.stream().noneMatch(ItemStack::isEmpty)) {
+            return Optional.empty();
+        }
+        return BBQDRecipesHelper
+                .find(level, BBQDRecipes.GRILLING_TYPE, new SingleRecipeInput(itemStack))
+                .map(RecipeHolder::value);
     }
 
-    public Optional<CampfireCookingRecipe> findMatchingCampfireRecipe(ItemStack itemStack) {
-        return this.world != null && this.items.stream().anyMatch(ItemStack::isEmpty) ? this.world.getRecipeManager().getFirstMatch(RecipeType.CAMPFIRE_COOKING, new SimpleInventory(itemStack), this.world) : Optional.empty();
+    public Optional<net.minecraft.world.item.crafting.CampfireCookingRecipe> findMatchingCampfireRecipe(ItemStack itemStack) {
+        Level level = this.getLevel();
+        if (level == null || this.items.stream().noneMatch(ItemStack::isEmpty)) {
+            return Optional.empty();
+        }
+        return BBQDRecipesHelper
+                .find(level, RecipeType.CAMPFIRE_COOKING, new SingleRecipeInput(itemStack))
+                .map(RecipeHolder::value);
     }
 
-    public Vec2f getGrillItemOffset(int index) {
+    public Vector2f getGrillItemOffset(int index) {
         final float xOffset = .2f;
         final float yOffset = .0f;
-        final Vec2f[] offsets = {new Vec2f(xOffset, yOffset), new Vec2f(-xOffset, yOffset)};
-
+        final Vector2f[] offsets = {new Vector2f(xOffset, yOffset), new Vector2f(-xOffset, yOffset)};
         return offsets[index];
     }
 
     public void inventoryChanged() {
-        markDirty();
-        if (world != null) {
-            world.updateListeners(getPos(), getCachedState(), getCachedState(), Block.NOTIFY_ALL);
+        setChanged();
+        Level level = this.getLevel();
+        if (level != null) {
+            BlockState state = this.getBlockState();
+            level.sendBlockUpdated(this.getBlockPos(), state, state, net.minecraft.world.level.block.Block.UPDATE_ALL);
         }
     }
 
     private void addParticles() {
-        if (world == null) return;
+        Level level = this.getLevel();
+        if (level == null) {
+            return;
+        }
 
         for (int i = 0; i < items.size(); ++i) {
             grillingTimes[i]++;
-            if (!items.get(i).isEmpty()) {
-                Vec2f grillItemOffset = getGrillItemOffset(i);
-                Direction direction = getCachedState().get(HorizontalFacingBlock.FACING);
-                int directionIndex = direction.getHorizontal();
-                Vec2f offset = directionIndex % 2 == 0 ? grillItemOffset : new Vec2f(grillItemOffset.y, grillItemOffset.x);
+            if (items.get(i).isEmpty()) {
+                continue;
+            }
 
-                double x = ((double) pos.getX() + 0.5D) - (direction.getOffsetX() * offset.x) + (direction.rotateYClockwise().getOffsetX() * offset.x);
-                double y = (double) pos.getY() + 1.0D;
-                double z = ((double) pos.getZ() + 0.5D) - (direction.getOffsetZ() * offset.y) + (direction.rotateYClockwise().getOffsetZ() * offset.y);
+            Vector2f grillItemOffset = getGrillItemOffset(i);
+            Direction direction = getBlockState().getValue(HorizontalDirectionalBlock.FACING);
+            int directionIndex = direction.get2DDataValue();
+            Vector2f offset = directionIndex % 2 == 0
+                    ? grillItemOffset
+                    : new Vector2f(grillItemOffset.y, grillItemOffset.x);
 
-                if (world.random.nextFloat() < 0.2f) {
-                    world.addParticle(ParticleTypes.SMOKE, x, y, z, 0.0D, 5.0E-4D, 0.0D);
-                }
+            double x = ((double) getBlockPos().getX() + 0.5D)
+                    - (direction.getStepX() * offset.x)
+                    + (direction.getClockWise().getStepX() * offset.x);
+            double y = (double) getBlockPos().getY() + 1.0D;
+            double z = ((double) getBlockPos().getZ() + 0.5D)
+                    - (direction.getStepZ() * offset.y)
+                    + (direction.getClockWise().getStepZ() * offset.y);
+
+            if (level.getRandom().nextFloat() < 0.2f) {
+                level.addParticle(ParticleTypes.SMOKE, x, y, z, 0.0D, 5.0E-4D, 0.0D);
             }
         }
     }
 
     @Override
-    public DefaultedList<ItemStack> getItems() {
+    public NonNullList<ItemStack> getItems() {
         return items;
     }
 
-    //NBT And Server
+    // ---- Persistence -------------------------------------------------------
 
-    public static void sendUpdatePacket(BlockEntity blockEntity) {
-        Packet<ClientPlayPacketListener> packet = blockEntity.toUpdatePacket();
-        if (packet != null) {
-            sendUpdatePacket(blockEntity.getWorld(), blockEntity.getPos(), packet);
+    @Override
+    protected void saveAdditional(ValueOutput output) {
+        super.saveAdditional(output);
+        ContainerHelper.saveAllItems(output, this.items, true);
+
+        output.putIntArray(TAG_KEY_COOKING_TIMES, this.grillingTimes);
+        output.putIntArray(TAG_KEY_COOKING_TOTAL_TIMES, this.grillingTimesTotal);
+        for (int i = 0; i < this.flipped.length; i++) {
+            output.putBoolean(TAG_FLIPPED + i, this.flipped[i]);
         }
     }
 
-    private static void sendUpdatePacket(World level, BlockPos pos, Packet<ClientPlayPacketListener> packet) {
-        if (level instanceof ServerWorld server) {
-            List<ServerPlayerEntity> players = server.getChunkManager().threadedAnvilChunkStorage.getPlayersWatchingChunk(new ChunkPos(pos), false);
-            players.forEach(player -> player.networkHandler.sendPacket(packet));
-        }
-    }
-
     @Override
-    public BlockEntityUpdateS2CPacket toUpdatePacket() {
-        return BlockEntityUpdateS2CPacket.create(this);
-    }
-
-    @Override
-    public NbtCompound toInitialChunkDataNbt() {
-        NbtCompound nbtCompound = new NbtCompound();
-        Inventories.writeNbt(nbtCompound, this.items, true);
-        this.writeFlipped(nbtCompound);
-        return nbtCompound;
-    }
-
-    @Override
-    protected void writeNbt(NbtCompound nbt) {
-        super.writeNbt(nbt);
-        Inventories.writeNbt(nbt, items, true);
-        this.writeFlipped(nbt);
-        nbt.putIntArray(TAG_KEY_COOKING_TIMES, grillingTimes);
-        nbt.putIntArray(TAG_KEY_COOKING_TOTAL_TIMES, grillingTimesTotal);
-    }
-
-    @Override
-    public void readNbt(NbtCompound nbt) {
-        super.readNbt(nbt);
+    protected void loadAdditional(ValueInput input) {
+        super.loadAdditional(input);
         this.items.clear();
-        Inventories.readNbt(nbt, items);
+        ContainerHelper.loadAllItems(input, this.items);
 
-        if (nbt.contains(TAG_KEY_COOKING_TIMES, 11)) {
-            int[] cookingTimeRead = nbt.getIntArray(TAG_KEY_COOKING_TIMES);
-            System.arraycopy(cookingTimeRead, 0, grillingTimes, 0, Math.min(grillingTimesTotal.length, cookingTimeRead.length));
-        }
-        if (nbt.contains(TAG_KEY_COOKING_TOTAL_TIMES, 11)) {
-            int[] cookingTotalTimeRead = nbt.getIntArray(TAG_KEY_COOKING_TOTAL_TIMES);
-            System.arraycopy(cookingTotalTimeRead, 0, grillingTimesTotal, 0, Math.min(grillingTimesTotal.length, cookingTotalTimeRead.length));
-        }
+        input.getIntArray(TAG_KEY_COOKING_TIMES).ifPresent(read ->
+                System.arraycopy(read, 0, grillingTimes, 0, Math.min(grillingTimes.length, read.length)));
+        input.getIntArray(TAG_KEY_COOKING_TOTAL_TIMES).ifPresent(read ->
+                System.arraycopy(read, 0, grillingTimesTotal, 0, Math.min(grillingTimesTotal.length, read.length)));
 
-        if (nbt.contains("Flipped", NbtElement.BYTE_ARRAY_TYPE)) {
-            byte[] flipped = nbt.getByteArray("Flipped");
-            for (int i = 0; i < Math.min(this.flipped.length, flipped.length); i++) {
-                this.flipped[i] = flipped[i] == 1;
-            }
+        for (int i = 0; i < this.flipped.length; i++) {
+            this.flipped[i] = input.getBooleanOr(TAG_FLIPPED + i, false);
         }
-    }
-
-    private void writeFlipped(NbtCompound compound) {
-        byte[] flipped = new byte[this.flipped.length];
-        for(int i = 0; i < this.flipped.length; i++) {
-            flipped[i] = (byte) (this.flipped[i] ? 1 : 0);
-        }
-        compound.putByteArray("Flipped", flipped);
     }
 }

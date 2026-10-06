@@ -1,0 +1,11 @@
+{
+  "type": "barbequesdelight:skewering",
+  "ingredients": [
+    "farmersdelight:chicken_cuts",
+    "#c:crops/onion"
+  ],
+  "result": {
+    "id": "barbequesdelight:chicken_skewer"
+  },
+  "count": 2
+}

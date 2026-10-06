@@ -1,0 +1,11 @@
+{
+  "type": "barbequesdelight:skewering",
+  "ingredients": [
+    "minecraft:rabbit",
+    "farmersdelight:cabbage_leaf"
+  ],
+  "result": {
+    "id": "barbequesdelight:rabbit_skewer"
+  },
+  "count": 2
+}

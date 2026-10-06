@@ -1,0 +1,11 @@
+{
+  "type": "barbequesdelight:skewering",
+  "ingredients": [
+    "minecraft:brown_mushroom",
+    "minecraft:beef"
+  ],
+  "result": {
+    "id": "barbequesdelight:beef_skewer"
+  },
+  "count": 2
+}

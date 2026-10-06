@@ -1,0 +1,16 @@
+{
+  "values": [
+    {
+      "id": "barbequesdelight:butcher/1/chilli_powder",
+      "required": false
+    },
+    {
+      "id": "barbequesdelight:butcher/1/cumin_powder",
+      "required": false
+    },
+    {
+      "id": "barbequesdelight:butcher/1/pepper_powder",
+      "required": false
+    }
+  ]
+}

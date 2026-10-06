@@ -1,58 +1,63 @@
 package com.mao.barbequesdelight.common.block.client;
 
 import com.mao.barbequesdelight.common.block.blockentity.TrayBlockEntity;
-import net.minecraft.block.HorizontalFacingBlock;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.WorldRenderer;
-import net.minecraft.client.render.block.entity.BlockEntityRenderer;
-import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
-import net.minecraft.client.render.model.json.ModelTransformationMode;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.collection.DefaultedList;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.RotationAxis;
-import net.minecraft.util.math.Vec2f;
+import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+import net.minecraft.core.Direction;
+import net.minecraft.world.item.ItemStack;
 
-import java.util.Objects;
+/**
+ * Draws the tray's three slots. Each slot's stack size decides how many flat item models
+ * are drawn, spread along the tray's length.
+ */
+public class TrayRenderer
+        extends AbstractItemDisplayRenderer<TrayBlockEntity, TrayRenderer.State> {
 
-public class TrayRenderer implements BlockEntityRenderer<TrayBlockEntity> {
-    public TrayRenderer(BlockEntityRendererFactory.Context context){}
+    public static class State extends AbstractItemDisplayRenderer.DisplayRenderState {
+    }
+
+    public TrayRenderer(BlockEntityRendererProvider.Context context) {
+        super(context);
+    }
 
     @Override
-    public void render(TrayBlockEntity entity, float tickDelta, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light, int overlay) {
-        DefaultedList<ItemStack> inventory = entity.getItems();
-        int intPos = (int) entity.getPos().asLong();
+    public State createRenderState() {
+        return new State();
+    }
 
-        for (int i = 0; i < inventory.size(); ++i) {
-            ItemStack itemStack = inventory.get(i);
-            if (!itemStack.isEmpty()) {
-                Direction direction = entity.getCachedState().get(HorizontalFacingBlock.FACING).getOpposite();
+    @Override
+    protected void extractItems(TrayBlockEntity entity, State state, Direction facing) {
+        for (int i = 0; i < entity.getItems().size(); i++) {
+            ItemStack stack = entity.getItems().get(i);
+            if (stack.isEmpty()) {
+                continue;
+            }
 
-                for (int j = 0; j < this.getModelCount(itemStack); ++j){
-                    matrices.push();
+            int models = getModelCount(stack);
+            // Vertical slot offset, matching the original tray placement.
+            float slotLift = 0.3f + (i == 0 ? 0.1f : i == 1 ? -0.2f : -0.5f) - 0.2f;
 
-                    float xOffset = direction.getAxis() == Direction.Axis.Z ? 0.8f - (j*0.2f) : 0.5f;
-                    float zOffset = direction.getAxis() == Direction.Axis.X ? 0.8f - (j*0.2f) : 0.5f;
-                    matrices.translate(xOffset, 0.075, zOffset);
-                    float angle = -direction.asRotation();
-                    matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(angle));
-                    matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(90.0F));
-                    Vec2f itemOffset = entity.getTrayItemOffset(i);
-                    matrices.translate(itemOffset.x, itemOffset.y, 0.0);
-                    matrices.scale(0.375f, 0.375f, 0.375f);
-                    int lightAbove = WorldRenderer.getLightmapCoordinates(Objects.requireNonNull(entity.getWorld()), entity.getPos().up());
-                    MinecraftClient.getInstance().getItemRenderer().renderItem(itemStack, ModelTransformationMode.FIXED, lightAbove, overlay, matrices, vertexConsumers, entity.getWorld(), intPos + i);
+            for (int j = 0; j < models; j++) {
+                ItemEntry entry = addItem(entity, state, stack);
 
-                    matrices.pop();
+                // Spread the models along the axis the tray is facing.
+                float spread = 0.3f - (j * 0.2f);
+                if (facing.getAxis() == Direction.Axis.Z) {
+                    entry.offsetX = spread - 0.0f;
+                    entry.offsetY = 0.0f;
+                } else {
+                    entry.offsetX = 0.0f;
+                    entry.offsetY = spread;
                 }
+
+                entry.lift = 0.075 + slotLift;
+                entry.flat = true;
+                entry.scale = 0.375f;
             }
         }
     }
 
-    private int getModelCount(ItemStack stack){
-        int maxCount = stack.getMaxCount();
+    private int getModelCount(ItemStack stack) {
+        int maxCount = stack.getMaxStackSize();
         int count = stack.getCount();
 
         if (maxCount == 64) {

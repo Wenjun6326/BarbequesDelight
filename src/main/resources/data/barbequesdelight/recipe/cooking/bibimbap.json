@@ -1,0 +1,14 @@
+{
+  "type": "farmersdelight:cooking",
+  "cookingtime": 200,
+  "experience": 1.0,
+  "ingredients": [
+    "#c:crops/rice",
+    "minecraft:carrot",
+    "#c:crops/onion",
+    "#c:foods/skewers"
+  ],
+  "result": {
+    "id": "barbequesdelight:bibimbap"
+  }
+}

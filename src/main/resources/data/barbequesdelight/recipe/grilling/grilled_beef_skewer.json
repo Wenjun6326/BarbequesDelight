@@ -1,0 +1,6 @@
+{
+  "type": "barbequesdelight:grilling",
+  "ingredient": "barbequesdelight:beef_skewer",
+  "result": "barbequesdelight:grilled_beef_skewer",
+  "grillingtime": 360
+}

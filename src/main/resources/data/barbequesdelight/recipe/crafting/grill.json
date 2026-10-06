@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "ICI",
+    "I I",
+    "I I"
+  ],
+  "key": {
+    "I": "minecraft:iron_ingot",
+    "C": "minecraft:iron_trapdoor"
+  },
+  "result": {
+    "id": "barbequesdelight:grill",
+    "count": 1
+  }
+}

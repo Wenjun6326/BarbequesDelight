@@ -3,25 +3,30 @@ package com.mao.barbequesdelight.common.item;
 import com.mao.barbequesdelight.common.util.BBQDSeasoning;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.item.TooltipContext;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.particle.DustParticleEffect;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.core.particles.DustParticleOptions;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.component.TooltipDisplay;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.sounds.SoundEvents;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.List;
+import java.util.function.Consumer;
 
+/**
+ * A seasoning powder or sauce. Carries 64 uses and applies its flavour to a skewer placed
+ * on a Farmer's Delight cutting board.
+ */
 public class SeasoningItem extends Item {
     private final BBQDSeasoning seasoning;
 
-    public SeasoningItem(BBQDSeasoning seasoning) {
-        super(new Settings().maxDamage(64));
+    public SeasoningItem(Item.Properties properties, BBQDSeasoning seasoning) {
+        super(properties.durability(64));
         this.seasoning = seasoning;
     }
 
@@ -31,25 +36,36 @@ public class SeasoningItem extends Item {
 
     @Environment(EnvType.CLIENT)
     @Override
-    public void appendTooltip(ItemStack stack, @Nullable World world, List<Text> tooltip, TooltipContext context) {
-        tooltip.add(Text.translatable("item.barbequesdelight." + getSeasoning().getName() + ".tooltip").formatted(Formatting.YELLOW));
+    public void appendHoverText(ItemStack stack, Item.TooltipContext context, TooltipDisplay display,
+                                Consumer<Component> tooltip, TooltipFlag flag) {
+        tooltip.accept(Component.translatable("item.barbequesdelight." + getSeasoning().getName() + ".tooltip")
+                .withStyle(ChatFormatting.YELLOW));
     }
 
-    public void sprinkle(ItemStack skewer, Vec3d pos, PlayerEntity player, ItemStack stackInHand){
-        skewer.getOrCreateNbt().putString("seasoning", getSeasoning().name());
-        player.playSound(SoundEvents.BLOCK_SAND_BREAK, 0.7f, 1.0f);
-        Integer color = seasoning.color.getColorValue();
-        int col = color == null ? 0 : color;
-        player.getWorld().addParticle(new DustParticleEffect(Vec3d.unpackRgb(col).toVector3f(), 1.5f),
-                pos.x, pos.y, pos.z, 8, 0d, 0);
-        stackInHand.damage(1, player, player1 -> player1.sendToolBreakStatus(player1.getActiveHand()));
+    /** Applies this seasoning to {@code skewer}, plays the feedback, and uses one durability. */
+    public void sprinkle(ItemStack skewer, Vec3 pos, Player player, ItemStack stackInHand) {
+        getSeasoning().apply(skewer);
+
+        player.playSound(SoundEvents.SAND_BREAK, 0.7f, 1.0f);
+
+        Integer color = seasoning.color.getColor();
+        int rgb = color == null ? 0 : color;
+        float r = ((rgb >> 16) & 0xFF) / 255.0f;
+        float g = ((rgb >> 8) & 0xFF) / 255.0f;
+        float b = (rgb & 0xFF) / 255.0f;
+        player.level().addParticle(new DustParticleOptions(rgb, 1.5f), pos.x, pos.y, pos.z, 8, 0d, 0);
+
+        stackInHand.hurtAndBreak(1, player, net.minecraft.world.entity.EquipmentSlot.MAINHAND);
     }
 
     public boolean canSprinkle(ItemStack storedStack) {
-        if (storedStack.isEmpty())
+        if (storedStack.isEmpty()) {
             return false;
-        if (!(storedStack.getItem() instanceof SimpleSkewerItem))
+        }
+        if (!(storedStack.getItem() instanceof SimpleSkewerItem)) {
             return false;
-        return storedStack.getNbt() == null || !storedStack.getNbt().contains("seasoning");
+        }
+        // A skewer may only be seasoned once.
+        return !BBQDSeasoning.hasSeasoning(storedStack);
     }
 }

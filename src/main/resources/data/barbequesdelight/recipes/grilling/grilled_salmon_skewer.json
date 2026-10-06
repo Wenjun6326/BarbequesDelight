@@ -1,8 +1,0 @@
-{
-  "type": "barbequesdelight:grilling",
-  "ingredient": {
-    "item": "barbequesdelight:salmon_skewer"
-  },
-  "result": "barbequesdelight:grilled_salmon_skewer",
-  "grillingtime": 360
-}

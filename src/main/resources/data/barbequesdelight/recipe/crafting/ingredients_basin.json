@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "I I",
+    " I "
+  ],
+  "key": {
+    "I": "#minecraft:wooden_slabs"
+  },
+  "result": {
+    "id": "barbequesdelight:ingredients_basin",
+    "count": 1
+  }
+}

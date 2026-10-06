@@ -1,40 +1,75 @@
 package com.mao.barbequesdelight.integration.rei;
 
 import com.mao.barbequesdelight.BarbequesDelight;
-import com.mao.barbequesdelight.common.recipe.GrillingRecipe;
-import com.mao.barbequesdelight.common.recipe.SkeweringRecipe;
-import com.mao.barbequesdelight.integration.rei.barbecuing.GrillCategory;
-import com.mao.barbequesdelight.integration.rei.barbecuing.GrillDisplay;
-import com.mao.barbequesdelight.integration.rei.skewering.SkeweringCategory;
-import com.mao.barbequesdelight.integration.rei.skewering.SkeweringDisplay;
-import me.shedaniel.math.Point;
-import me.shedaniel.math.Rectangle;
-import me.shedaniel.rei.api.client.plugins.REIClientPlugin;
+import me.shedaniel.rei.api.client.gui.Renderer;
 import me.shedaniel.rei.api.client.registry.category.CategoryRegistry;
+import me.shedaniel.rei.api.client.registry.display.DisplayCategory;
 import me.shedaniel.rei.api.client.registry.display.DisplayRegistry;
 import me.shedaniel.rei.api.common.category.CategoryIdentifier;
+import me.shedaniel.rei.api.common.display.Display;
+import me.shedaniel.rei.api.common.util.EntryStacks;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.ItemLike;
 
-public class BBQDREIPlugin implements REIClientPlugin {
-    public static final CategoryIdentifier<GrillDisplay> GRILL_DISPLAY_CATEGORY = CategoryIdentifier.of(BarbequesDelight.asID("grill"));
-    public static final CategoryIdentifier<SkeweringDisplay> SKEWERING_DISPLAY_CATEGORY = CategoryIdentifier.of(BarbequesDelight.asID("skewering"));
+/**
+ * Roughly Enough Items integration.
+ *
+ * <p>In 26.1 recipes expose their own vanilla {@code RecipeDisplay}s through
+ * {@code Recipe#display()}, which REI turns into displays automatically. This plugin therefore
+ * only has to register the two categories and their workstations.</p>
+ */
+public class BBQDREIPlugin implements me.shedaniel.rei.api.client.plugins.REIClientPlugin {
 
-    @Override
-    public void registerDisplays(DisplayRegistry registry) {
-        registry.registerRecipeFiller(GrillingRecipe.class, GrillingRecipe.Type.INSTANCE, GrillDisplay::new);
-        registry.registerRecipeFiller(SkeweringRecipe.class, SkeweringRecipe.Type.INSTANCE, SkeweringDisplay::new);
-    }
+    public static final CategoryIdentifier<Display> GRILLING =
+            CategoryIdentifier.of(BarbequesDelight.asID("grilling"));
+    public static final CategoryIdentifier<Display> SKEWERING =
+            CategoryIdentifier.of(BarbequesDelight.asID("skewering"));
 
     @Override
     public void registerCategories(CategoryRegistry registry) {
-        registry.add(new GrillCategory());
-        registry.add(new SkeweringCategory());
+        registry.add(new WorkstationCategory(GRILLING, "barbequesdelight.rei.grilling",
+                com.mao.barbequesdelight.registry.BBQDItems.GRILL,
+                BarbequesDelight.asID("textures/gui/grill_rei.png")));
+        registry.add(new WorkstationCategory(SKEWERING, "barbequesdelight.rei.skewering",
+                com.mao.barbequesdelight.registry.BBQDItems.INGREDIENTS_BASIN,
+                BarbequesDelight.asID("textures/gui/skewering_rei.png")));
+
+        registry.addWorkstations(GRILLING,
+                EntryStacks.of(com.mao.barbequesdelight.registry.BBQDItems.GRILL));
+        registry.addWorkstations(SKEWERING,
+                EntryStacks.of(com.mao.barbequesdelight.registry.BBQDItems.INGREDIENTS_BASIN));
     }
 
-    public static Rectangle centeredIntoRecipeBase(Point origin, int width, int height) {
-        return centeredInto(new Rectangle(origin.x, origin.y, 150, 66), width, height);
+    @Override
+    public void registerDisplays(DisplayRegistry registry) {
+        // Displays come from the recipes' own RecipeDisplay list.
     }
 
-    public static Rectangle centeredInto(Rectangle origin, int width, int height) {
-        return new Rectangle(origin.x + (origin.width - width) / 2, origin.y + (origin.height - height) / 2, width, height);
+    /** Minimal category: title, icon and workstation are all REI needs for our displays. */
+    private record WorkstationCategory(CategoryIdentifier<Display> id, String titleKey,
+                                       ItemLike icon, Identifier background)
+            implements DisplayCategory<Display> {
+
+        @Override
+        public CategoryIdentifier<? extends Display> getCategoryIdentifier() {
+            return id;
+        }
+
+        @Override
+        public Component getTitle() {
+            return Component.translatable(titleKey);
+        }
+
+        @Override
+        public Renderer getIcon() {
+            return EntryStacks.of(icon);
+        }
+    }
+
+    /** Kept for API symmetry with older builds. */
+    public static ItemStack icon(ItemLike item) {
+        return new ItemStack(item);
     }
 }

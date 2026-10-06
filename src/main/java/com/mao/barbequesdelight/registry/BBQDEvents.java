@@ -1,26 +1,29 @@
 package com.mao.barbequesdelight.registry;
 
-
 import com.mao.barbequesdelight.common.item.SeasoningItem;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
-import net.minecraft.block.entity.BlockEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.ActionResult;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.ItemStack;
 import vectorwing.farmersdelight.common.block.entity.CuttingBoardBlockEntity;
 
+/**
+ * Lets a seasoning be applied to a skewer sitting on a Farmer's Delight cutting board.
+ * Runs on both sides so the client prediction shows the particles and sound immediately.
+ */
 public class BBQDEvents {
-    public static void registerBBQDEvents(){
+    public static void registerBBQDEvents() {
         UseBlockCallback.EVENT.register((player, world, hand, hitResult) -> {
-            BlockEntity blockEntity = world.getBlockEntity(hitResult.getBlockPos());
-            if (blockEntity instanceof CuttingBoardBlockEntity be) {
-                ItemStack handStack = player.getStackInHand(hand);
-                ItemStack storedStack = be.getStoredItem();
-                if (handStack.getItem() instanceof SeasoningItem seasoningItem && seasoningItem.canSprinkle(storedStack)) {
-                    seasoningItem.sprinkle(storedStack, hitResult.getPos(), player, handStack);
-                    return ActionResult.success(world.isClient());
+            if (world.getBlockEntity(hitResult.getBlockPos()) instanceof CuttingBoardBlockEntity board) {
+                ItemStack handStack = player.getItemInHand(hand);
+                ItemStack storedStack = board.getStoredItem();
+
+                if (handStack.getItem() instanceof SeasoningItem seasoningItem
+                        && seasoningItem.canSprinkle(storedStack)) {
+                    seasoningItem.sprinkle(storedStack, hitResult.getLocation(), player, handStack);
+                    return InteractionResult.SUCCESS;
                 }
             }
-            return ActionResult.PASS;
+            return InteractionResult.PASS;
         });
     }
 }

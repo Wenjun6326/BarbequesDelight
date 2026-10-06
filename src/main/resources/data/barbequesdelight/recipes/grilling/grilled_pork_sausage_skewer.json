@@ -1,8 +1,0 @@
-{
-  "type": "barbequesdelight:grilling",
-  "ingredient": {
-    "item": "barbequesdelight:pork_sausage_skewer"
-  },
-  "result": "barbequesdelight:grilled_pork_sausage_skewer",
-  "grillingtime": 400
-}

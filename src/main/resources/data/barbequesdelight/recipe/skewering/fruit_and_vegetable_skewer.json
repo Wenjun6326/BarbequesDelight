@@ -1,0 +1,28 @@
+{
+  "type": "barbequesdelight:skewering",
+  "ingredients": [
+    {
+      "fabric:type": "fabric:any",
+      "ingredients": [
+        "#c:crops/tomato",
+        "#c:crops/onion",
+        "minecraft:carrot",
+        "#c:mushrooms",
+        "minecraft:potato"
+      ]
+    },
+    {
+      "fabric:type": "fabric:any",
+      "ingredients": [
+        "minecraft:apple",
+        "minecraft:sweet_berries",
+        "minecraft:glow_berries",
+        "minecraft:melon_slice"
+      ]
+    }
+  ],
+  "result": {
+    "id": "barbequesdelight:fruit_and_vegetable_skewer"
+  },
+  "count": 2
+}

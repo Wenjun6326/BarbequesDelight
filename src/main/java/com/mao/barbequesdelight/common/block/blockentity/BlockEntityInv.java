@@ -1,33 +1,39 @@
 package com.mao.barbequesdelight.common.block.blockentity;
 
-import blue.endless.jankson.annotation.Nullable;
-import net.minecraft.block.HorizontalFacingBlock;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.inventory.Inventories;
-import net.minecraft.inventory.SidedInventory;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.collection.DefaultedList;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
+import net.minecraft.core.Direction;
+import net.minecraft.core.NonNullList;
+import net.minecraft.world.ContainerHelper;
+import net.minecraft.world.WorldlyContainer;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.HorizontalDirectionalBlock;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.core.BlockPos;
+import org.jetbrains.annotations.Nullable;
 
-public interface BlockEntityInv extends SidedInventory {
+/**
+ * Shared inventory behaviour for the grill, basin and tray.
+ *
+ * <p>Deliberately exposes no automation-facing slots ({@link #getSlotsForFace} is empty),
+ * matching the 1.20.1 original where {@code getAvailableSlots} returned an empty array, so
+ * hoppers and pipes cannot insert or extract.</p>
+ */
+public interface BlockEntityInv extends WorldlyContainer {
 
-    DefaultedList<ItemStack> getItems();
+    NonNullList<ItemStack> getItems();
 
     @Override
-    default int size() {
+    default int getContainerSize() {
         return getItems().size();
     }
 
     @Override
     default boolean isEmpty() {
-        for (int i = 0; i < size(); i++) {
-            ItemStack stack = getStack(i);
-            if (!stack.isEmpty()) {
+        for (int i = 0; i < getContainerSize(); i++) {
+            if (!getItem(i).isEmpty()) {
                 return false;
             }
         }
@@ -35,64 +41,70 @@ public interface BlockEntityInv extends SidedInventory {
     }
 
     @Override
-    default ItemStack getStack(int slot) {
+    default ItemStack getItem(int slot) {
         return getItems().get(slot);
     }
 
     @Override
-    default ItemStack removeStack(int slot, int count) {
-        ItemStack result = Inventories.splitStack(getItems(), slot, count);
+    default ItemStack removeItem(int slot, int count) {
+        ItemStack result = ContainerHelper.removeItem(getItems(), slot, count);
         if (!result.isEmpty()) {
-            markDirty();
+            setChanged();
         }
         return result;
     }
 
     @Override
-    default void setStack(int slot, ItemStack stack) {
-        ItemStack itemStack = stack.copy();
+    default void setItem(int slot, ItemStack stack) {
+        ItemStack copy = stack.copy();
         stack.setCount(1);
-        getItems().set(slot, itemStack);
-        markDirty();
+        getItems().set(slot, copy);
+        setChanged();
     }
 
     @Override
-    default ItemStack removeStack(int slot) {
-        return Inventories.removeStack(getItems(), slot);
+    default ItemStack removeItemNoUpdate(int slot) {
+        return ContainerHelper.takeItem(getItems(), slot);
     }
 
     @Override
-    default void clear() {
-        for (int i = 0; i < size(); i++) {
-            removeStack(i);
+    default void clearContent() {
+        for (int i = 0; i < getContainerSize(); i++) {
+            removeItemNoUpdate(i);
         }
     }
 
     @Override
-    default boolean canPlayerUse(PlayerEntity player) {
+    default boolean stillValid(Player player) {
         return true;
     }
 
     @Override
-    default int[] getAvailableSlots(Direction side) {
+    default int[] getSlotsForFace(Direction side) {
         return new int[0];
     }
 
     @Override
-    default boolean canExtract(int slot, ItemStack stack, Direction dir) {
+    default boolean canTakeItemThroughFace(int slot, ItemStack stack, Direction dir) {
         return true;
     }
 
     @Override
-    default boolean canInsert(int slot, ItemStack stack, @Nullable Direction dir) {
+    default boolean canPlaceItemThroughFace(int slot, ItemStack stack, @Nullable Direction dir) {
         return true;
     }
 
-    default int getSlotForHitting(BlockHitResult hit, World world){
-        if (hit.getType() == HitResult.Type.BLOCK && hit.getSide() == Direction.UP) {
-            Vec3d pos1 = hit.getPos();
-            Direction facing = world.getBlockState(hit.getBlockPos()).get(HorizontalFacingBlock.FACING).getOpposite();
+    /**
+     * Maps a hit on the top face to the left (0) or right (1) half of the block.
+     * Returns the slot count as a sentinel when the hit is not on the top face.
+     */
+    default int getSlotForHitting(BlockHitResult hit, Level world) {
+        if (hit.getType() == HitResult.Type.BLOCK && hit.getDirection() == Direction.UP) {
+            Vec3 pos1 = hit.getLocation();
+            Direction facing = world.getBlockState(hit.getBlockPos())
+                    .getValue(HorizontalDirectionalBlock.FACING).getOpposite();
             BlockPos pos = hit.getBlockPos();
+
             boolean left = false;
             boolean right = false;
             switch (facing) {
@@ -112,13 +124,16 @@ public interface BlockEntityInv extends SidedInventory {
                     left = pos1.z - (double) pos.getZ() > 0.5D;
                     right = pos1.z - (double) pos.getZ() < 0.5D;
                 }
+                default -> {
+                }
             }
+
             if (left) {
                 return 0;
             } else if (right) {
                 return 1;
             }
         }
-        return size();
+        return getContainerSize();
     }
 }

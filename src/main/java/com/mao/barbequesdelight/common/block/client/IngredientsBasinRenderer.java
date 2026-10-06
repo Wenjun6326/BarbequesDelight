@@ -1,56 +1,55 @@
 package com.mao.barbequesdelight.common.block.client;
 
 import com.mao.barbequesdelight.common.block.blockentity.IngredientsBasinBlockEntity;
-import net.minecraft.block.HorizontalFacingBlock;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.WorldRenderer;
-import net.minecraft.client.render.block.entity.BlockEntityRenderer;
-import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
-import net.minecraft.client.render.model.json.ModelTransformationMode;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.collection.DefaultedList;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.RotationAxis;
-import net.minecraft.util.math.Vec2f;
+import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+import net.minecraft.core.Direction;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 
-import java.util.Objects;
-import java.util.Random;
+/**
+ * Draws the ingredient piles in the basin. Stack size controls how many models are drawn,
+ * and a stack-seeded random scatters them slightly so a pile looks hand-placed.
+ */
+public class IngredientsBasinRenderer
+        extends AbstractItemDisplayRenderer<IngredientsBasinBlockEntity, IngredientsBasinRenderer.State> {
 
-public class IngredientsBasinRenderer implements BlockEntityRenderer<IngredientsBasinBlockEntity> {
+    public static class State extends AbstractItemDisplayRenderer.DisplayRenderState {
+    }
 
-    private final Random random = new Random();
-
-    public IngredientsBasinRenderer(BlockEntityRendererFactory.Context context){}
+    public IngredientsBasinRenderer(BlockEntityRendererProvider.Context context) {
+        super(context);
+    }
 
     @Override
-    public void render(IngredientsBasinBlockEntity entity, float tickDelta, MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light, int overlay) {
-        DefaultedList<ItemStack> inventory = entity.getItems();
-        int intPos = (int) entity.getPos().asLong();
+    public State createRenderState() {
+        return new State();
+    }
 
-        for (int i = 0; i < inventory.size(); ++i) {
-            ItemStack stack = entity.getStack(i);
-            Direction direction = entity.getCachedState().get(HorizontalFacingBlock.FACING).getOpposite();
-            int seed = stack.isEmpty() ? 187 : Item.getRawId(stack.getItem()) + stack.getCount();
-            this.random.setSeed(seed);
+    @Override
+    protected void extractItems(IngredientsBasinBlockEntity entity, State state, Direction facing) {
+        for (int i = 0; i < entity.getItems().size(); i++) {
+            ItemStack stack = entity.getItems().get(i);
 
-            for (int j = 0; j < getModelCount(stack); ++j){
-                matrices.push();
+            // The original seeded the scatter from the item id plus the stack count.
+            int seed = stack.isEmpty() ? 187 : Item.getId(stack.getItem()) + stack.getCount();
+            RandomSource random = seededRandom(seed);
 
-                float xOffset = (this.random.nextFloat() * 2.0F - 1.0F) * 0.15F * 0.2F;
-                float zOffset = (this.random.nextFloat() * 2.0F - 1.0F) * 0.15F * 0.2F;
-                float angle = -direction.asRotation();
-                renderPose(direction, j, xOffset, zOffset, matrices);
-                matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(angle));
-                Vec2f itemOffset = entity.getBasinItemOffset(i);
-                matrices.translate(itemOffset.x, itemOffset.y, 0.0);
-                matrices.scale(0.375f, 0.375f, 0.375f);
-                int lightAbove = WorldRenderer.getLightmapCoordinates(Objects.requireNonNull(entity.getWorld()), entity.getPos().up());
-                MinecraftClient.getInstance().getItemRenderer().renderItem(stack, ModelTransformationMode.FIXED, lightAbove, overlay, matrices, vertexConsumers, entity.getWorld(), intPos + i);
+            int models = getModelCount(stack);
+            for (int j = 0; j < models; j++) {
+                float scatterX = (random.nextFloat() * 2.0F - 1.0F) * 0.15F * 0.2F;
+                float scatterZ = (random.nextFloat() * 2.0F - 1.0F) * 0.15F * 0.2F;
 
-                matrices.pop();
+                ItemEntry entry = addItem(entity, state, stack);
+                entry.usePreTranslation = true;
+                entry.flat = false; // the pile pose already includes its own tilt
+                entry.scale = 0.375f;
+
+                // Basin half offset, matching getBasinItemOffset.
+                entry.offsetX = i == 0 ? 0.2f : -0.2f;
+                entry.offsetY = 0.0f;
+
+                applyPilePose(entry, facing.getOpposite(), j, scatterX, scatterZ);
             }
         }
     }
@@ -69,23 +68,35 @@ public class IngredientsBasinRenderer implements BlockEntityRenderer<Ingredients
         }
     }
 
-    protected static void renderPose(Direction direction, int count, float xOffset, float zOffset, MatrixStack matrices){
-        switch (direction.getOpposite()){
+    /** Port of the original {@code renderPose} switch. */
+    private static void applyPilePose(ItemEntry entry, Direction direction, int count,
+                                      float xOffset, float zOffset) {
+        switch (direction) {
             case SOUTH -> {
-                matrices.translate(0.5 + xOffset, 0.2, 0.15 + (double) count / 20);
-                matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees((float) -(20 + count * 4)));
+                entry.preX = (float) (0.5 + xOffset);
+                entry.preY = 0.2f;
+                entry.preZ = (float) (0.15 + (double) count / 20);
+                entry.preXRot = -(20 + count * 4);
             }
             case NORTH -> {
-                matrices.translate(0.5 + xOffset, 0.2, 0.85 - (double) count / 20);
-                matrices.multiply(RotationAxis.NEGATIVE_X.rotationDegrees((float) -(20 + count * 4)));
+                entry.preX = (float) (0.5 + xOffset);
+                entry.preY = 0.2f;
+                entry.preZ = (float) (0.85 - (double) count / 20);
+                entry.preXRot = -(20 + count * 4);
             }
             case EAST -> {
-                matrices.translate(0.15 + (double) count / 20, 0.2, 0.5 + zOffset);
-                matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees((float) (20 + count * 4)));
+                entry.preX = (float) (0.15 + (double) count / 20);
+                entry.preY = 0.2f;
+                entry.preZ = (float) (0.5 + zOffset);
+                entry.preZRot = (20 + count * 4);
             }
             case WEST -> {
-                matrices.translate(0.85 - (double) count / 20, 0.2, 0.5 + zOffset);
-                matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees((float) -(20 + count * 4)));
+                entry.preX = (float) (0.85 - (double) count / 20);
+                entry.preY = 0.2f;
+                entry.preZ = (float) (0.5 + zOffset);
+                entry.preZRot = -(20 + count * 4);
+            }
+            default -> {
             }
         }
     }
