@@ -242,6 +242,19 @@ Architectury are optional.
 
 These jars are `compileOnly`/`localRuntime` only and are **never bundled** into the output jar.
 
+### About the release jar
+
+The jar attached to a release is named for the download, while a local `./gradlew build` produces
+`build/libs/barbeques-delight-<version>.jar`. **The contents are identical**; the two files differ
+only in ZIP metadata, because a Java jar is not byte-for-byte reproducible by default (each ZIP
+entry carries a timestamp).
+
+One thing that *is* kept consistent: all text resources are stored with **LF** line endings, via
+[`.gitattributes`](.gitattributes). A Windows checkout would otherwise rewrite them to CRLF and
+produce a jar with different resource bytes than the one published here. If you want a build that
+matches the release, make sure the working tree has not been converted — `git ls-files --eol`
+should report `w/lf` for everything except `gradlew.bat`.
+
 ---
 
 ## Credits
