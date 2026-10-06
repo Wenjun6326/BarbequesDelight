@@ -1,0 +1,23 @@
+# Normalise line endings to LF in the repository.
+#
+# This port shares most of its Java sources and resources with the 1.20.1 original and is meant
+# to be mergeable with upstream updates. Without this, checking out on Windows would rewrite
+# every file to CRLF and turn each future diff into line-ending noise.
+* text=auto eol=lf
+
+# Windows scripts must keep CRLF to run correctly.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Gradle wrapper scripts are invoked by the wrapper itself; keep convention.
+gradlew text eol=lf
+
+# Binary assets must never be touched.
+*.jar binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ogg binary
+*.zip binary
+*.gz binary
