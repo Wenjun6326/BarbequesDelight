@@ -42,29 +42,19 @@ public class BBQDItems {
     public static final Item CHILLI_POWDER = register("chilli_powder",
             props -> new SeasoningItem(props, BBQDSeasoning.CHILLI), new Item.Properties());
 
-    // ---------------------------------------------------------------------------------
-    // UNFINISHED UPSTREAM FEATURE - deliberately left incomplete.
-    //
-    // These three sauces exist only in the author's development snapshot; they are NOT in
-    // the released 1.1.0 build. Upstream registers them but never shipped any asset or
-    // recipe for them: no texture, no item model, no crafting recipe, and no
-    // `item.barbequesdelight.<id>` / `.tooltip` / `.title` translation keys (only
-    // `item.barbequesdelight.flavor.<flavour>` exists).
-    //
-    // They consequently show as missing-texture placeholders named after their raw
-    // translation key, and cannot be obtained in survival.
-    //
-    // DO NOT "fix" this locally: this port mirrors upstream so that an upstream update can
-    // be merged without conflicts. See the README for the full list of what is missing.
-    // ---------------------------------------------------------------------------------
+    // The three sauces. They are incomplete upstream (no assets or recipe were ever shipped, so
+    // they rendered as missing-texture placeholders), but the Forge original is the reference
+    // implementation for this mod: its seasoning enum has always contained all six flavours, and
+    // it ships textures for them. They are implemented here to match, with the Forge spellings
+    // (`barbeque_sauce`) and use counts (sauces carry 16 uses, powders 64).
     public static final Item HONEY_MUSTARD_SAUCE = register("honey_mustard_sauce",
             props -> new SeasoningItem(props, BBQDSeasoning.HONEY_MUSTARD), new Item.Properties());
 
     public static final Item BUFFALO_SAUCE = register("buffalo_sauce",
             props -> new SeasoningItem(props, BBQDSeasoning.BUFFALO), new Item.Properties());
 
-    public static final Item BARBECUE_SAUCE = register("barbecue_sauce",
-            props -> new SeasoningItem(props, BBQDSeasoning.BARBECUE), new Item.Properties());
+    public static final Item BARBEQUE_SAUCE = register("barbeque_sauce",
+            props -> new SeasoningItem(props, BBQDSeasoning.BARBEQUE), new Item.Properties());
 
     public static final Item KEBAB_WRAP = register("kebab_wrap",
             props -> new ConsumableItem(props, true), foodProps(BBQDFoods.SKEWER_WRAP));

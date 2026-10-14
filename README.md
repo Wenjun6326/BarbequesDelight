@@ -4,14 +4,16 @@ A port of **[Barbeque's Delight](https://modrinth.com/mod/barbeques-delight)** 1
 [Farmer's Delight](https://modrinth.com/mod/farmers-delight) addon by
 **MaoMao (Aomiaomao)** — from Minecraft 1.20.1 / Fabric / Yarn to **Minecraft 26.1**.
 
-Ported version: **`fabric+26.1mc`**
+Port version: **`1.1.1` / `fabric+26.1mc`**
 
 > **This is an unofficial port.** All credit for the mod, its design, art and gameplay goes to
 > the original author. See [Credits](#credits). The upstream repository is
-> [AOMIAOMAO/BarbequesDelight](https://github.com/AOMIAOMAO/BarbequesDelight); this fork only
-> adds the 26.1 port.
+> [AOMIAOMAO/BarbequesDelight](https://github.com/AOMIAOMAO/BarbequesDelight); this fork adds the
+> 26.1 port, and brings the Fabric release up to parity with the author's
+> [Forge original](https://github.com/Minecraft-LightLand/BarbequesDelight).
 
-Gameplay, mechanics and textures are unchanged from 1.1.0. This is a port, not a redesign.
+Gameplay, mechanics and textures follow 1.1.0, plus the two features the Forge original has and
+the Fabric release was missing — see [Forge parity](#forge-parity-what-this-port-adds).
 
 ---
 
@@ -67,16 +69,69 @@ villager trade, a creative tab, and REI categories.
   place it. Sneak-click to **flip**; a flip is only accepted once the half is at least half
   cooked. Flip it and it cooks into the recipe result; leave it and it becomes `burnt_food`.
   Grilling recipes take priority over vanilla campfire recipes, which are used as a fallback
-  (`cookingTime - 200`). The grill must be **heated** — a heat source below it, such as a
-  campfire.
+  (`cookingTime - 200`). The grill must be **heated** — a heat source below it, or its own
+  mounted campfire (see below).
 - **Ingredients basin** — two halves. Right-click with an ingredient to store it, then hold a
   tool (a stick) in your main hand and an optional garnish in your off hand and right-click to
   skewer.
 - **Tray** — three display slots, stackable up to three high; `support=true` only for the middle
   tray of a three-high stack.
-- **Seasonings** — CUMIN heals 2, PEPPER halves eating time, CHILLI deals 2 fire damage and
-  restores 2 hunger, BUFFALO halves effect durations and adds +1 amplifier. Seasonings are
-  applied to a skewer on a Farmer's Delight cutting board.
+- **Seasonings** — three powders (64 uses) and three sauces (16 uses). Seasoning a skewer
+  rewrites its food effects:
+  - **CUMIN** heals 2 when eaten
+  - **PEPPER** halves the eating time
+  - **CHILLI** deals 2 fire damage and makes the skewer edible even when full
+  - **HONEY_MUSTARD** halves the effect duration and doubles its chance
+  - **BUFFALO** deals 2 fire damage, halves the effect duration and raises its amplifier by 1
+  - **BARBEQUE** doubles the effect duration
+
+  Skewers can be seasoned on a Farmer's Delight **cutting board**, or directly on the **grill**
+  while they are cooking.
+
+---
+
+## Forge parity (what this port adds)
+
+The upstream Fabric release is missing two things its Forge sibling has. Both are implemented
+here, using the Forge original
+([Minecraft-LightLand/BarbequesDelight](https://github.com/Minecraft-LightLand/BarbequesDelight))
+as the reference.
+
+### The grill can hold a campfire
+
+The Forge grill carries a `has_campfire` block state: it can be placed **on a lit campfire**, or
+a campfire can be **right-clicked onto the grill**. A mounted campfire:
+
+- lights the block (light level 15, like the Forge original),
+- renders the grill combined with a campfire model
+  (`block/grill_with_campfire.json`),
+- heats the grill on its own, so it cooks without any separate heat source,
+- is returned as an item when the grill is broken.
+
+Rendering the campfire requires combining two models. The Forge original uses the Forge-only
+`forge:composite` model loader, which does not exist in vanilla, so the campfire geometry is
+**inlined** into `grill_with_campfire.json` instead. The model is byte-for-byte vanilla-format and
+needs no loader.
+
+### The three sauces are implemented
+
+`honey_mustard_sauce`, `buffalo_sauce` and `barbeque_sauce` were registered by upstream but never
+given any assets, so they rendered as missing-texture placeholders named after their raw
+translation key. The Forge original has always had all six flavours in its seasoning enum and
+ships textures for the sauces, so this port completes them:
+
+- textures, item models and 26.1 client item definitions,
+- translation keys in all four languages (the Chinese names come from the Forge release:
+  蜂蜜芥末酱 / 布法罗酱 / 烤肉酱),
+- 16 uses each, versus 64 for the powders, matching Forge,
+- the Forge flavour effects listed above.
+
+`barbeque_sauce` uses the Forge spelling (`barbeque`, not `barbecue`), which matches the item id
+in the Forge original.
+
+**Note:** like the Forge original, the sauces have **no crafting recipe** — they are creative-mode
+items. This was confirmed against the Forge source and the Forge 1.0.6 release, neither of which
+contains a sauce recipe.
 
 ---
 
@@ -158,43 +213,43 @@ Verified against a running dedicated server and, where noted, a real client.
 | Check | Result |
 |---|---|
 | Dedicated server start (26.1 and 26.1.2) | 1855 recipes loaded, no parse errors |
-| Grill placed **on a lit campfire** | accepted; block entity created |
-| Grill on a campfire is heated | `isHeated=true` (campfires are heat sources via `#minecraft:campfires`) |
+| Grill placed **on a lit campfire** | `canSurvive=true`; block entity created |
+| Grill on a campfire is heated | `isHeated=true` **without any other heat source** |
+| Right-click a campfire onto a bare grill | `has_campfire` becomes `true`, held campfire consumed, grill becomes heated |
 | Basin ← item, then empty hand | stored in a half, taken back out |
 | Tray ← item | stored in slot 0 |
 | Grill ← raw skewer (cold and on a campfire) | placed in a half; only the heated one cooks |
 | Flip timing | refused before the half-way point, accepted after; result `grilled_beef_skewer` |
 | No flip | burns into `burnt_food` |
 | Skewering a real recipe (mushroom + beef + stick) | produces `beef_skewer`, consumes ingredient, garnish and tool |
+| Seasoning an item **while it is on the grill** | flavour is applied (`flavour=BUFFALO`) |
+| Sauce / powder durability | sauces `maxDamage=16`, powders `maxDamage=64` |
+| Seasoning effect changes | HONEY_MUSTARD 1200→600 ticks at chance 0.5→1.0; BUFFALO 600 ticks at amplifier +1; BARBEQUE 1200→2400 ticks; CHILLI `alwaysEat=true`; PEPPER 1.6s→0.8s |
 | Flint & steel on a grill | no crash |
 | Client interaction path | no crash; `useItemOn` reaches the block on a `ClientLevel` |
 
 ### Not verified
 
-The **client recipe prediction fix** (the `ClientRecipeSynchronizedEvent` integration) could not
-be confirmed on a live client: the build machine's dev client stopped completing startup (it
-hangs after the texture atlases, render thread spinning, no crash report — reproducible across
-four runs and unrelated to this mod, since the probes were never reached). The server-side path,
-the crash fix and every behaviour in the table above *were* verified. If you hit a client-only
-problem, please open an issue.
+- The **client recipe prediction fix** (the `ClientRecipeSynchronizedEvent` integration) and the
+  **campfire grill's rendering** could not be confirmed on a live client: the build machine's dev
+  client stopped completing startup (it hangs after the texture atlases, render thread spinning, no
+  crash report — reproducible across five runs and unrelated to this mod, since the probes were
+  never reached). Everything in the table above was verified server-side, including the model
+  files being valid JSON with the expected 16 elements.
+- The `grill_with_campfire.json` model has not been seen rendered in-game. It is built from the
+  vanilla campfire template's own geometry (extracted from the 26.1 client jar) combined with this
+  mod's grill elements, so it should be correct, but please report anything odd.
+
+If you hit a client-only problem, please open an issue.
 
 ---
 
 ## Notes carried over from upstream
 
 These are pre-existing upstream behaviours, reproduced faithfully rather than fixed. The goal is a
-faithful port, not a fork. **Nothing here was "repaired" on purpose.**
-
-### Three unfinished sauce items
-
-`honey_mustard_sauce`, `buffalo_sauce` and `barbecue_sauce` exist only in the author's development
-snapshot; they are **not** in the released 1.1.0 build. Upstream registers them but never shipped
-any asset or recipe: no texture, no item model, no crafting recipe, no `.tooltip` / `.title`
-translation key (only `item.barbequesdelight.flavor.*` exists).
-
-They therefore appear in the creative tab as missing-texture placeholders named after their raw
-translation key and cannot be obtained in survival. This is deliberate — do not "fix" it locally,
-so an upstream update can be merged without conflicts.
+faithful port, not a fork. **Nothing here was "repaired" on purpose** — the one exception is the
+three sauces and the campfire grill, which are described under
+[Forge parity](#forge-parity-what-this-port-adds).
 
 ### Tray consumes the whole held stack
 

@@ -169,9 +169,20 @@ public class GrillBlockEntity extends SyncedBlockEntity implements BlockEntityIn
         }
     }
 
+    /**
+     * A mounted campfire heats the grill by itself, matching the Forge original, which ORs the
+     * {@code has_campfire} state with the usual heat-source check below.
+     */
     public boolean isHeated() {
         Level level = this.getLevel();
-        return level != null && this.isHeated(level, this.getBlockPos());
+        if (level == null) {
+            return false;
+        }
+        if (this.getBlockState().getValue(
+                com.mao.barbequesdelight.common.block.GrillBlock.HAS_CAMPFIRE)) {
+            return true;
+        }
+        return this.isHeated(level, this.getBlockPos());
     }
 
     public boolean isBarbecuing() {

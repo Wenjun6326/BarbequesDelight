@@ -1,6 +1,7 @@
 package com.mao.barbequesdelight.common.block;
 
 import com.mao.barbequesdelight.common.block.blockentity.GrillBlockEntity;
+import com.mao.barbequesdelight.common.item.SeasoningItem;
 import com.mao.barbequesdelight.common.recipe.GrillingRecipe;
 import com.mao.barbequesdelight.registry.BBQDEntityTypes;
 import com.mojang.serialization.MapCodec;
@@ -13,14 +14,18 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.Containers;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.item.crafting.CampfireCookingRecipe;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.ScheduledTickAccess;
 import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.HorizontalDirectionalBlock;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.RenderShape;
@@ -30,6 +35,8 @@ import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
@@ -45,16 +52,25 @@ import java.util.Optional;
  * The grill block. Two halves on the top face, each cooking one item while heated.
  * Sneak-clicking a partially cooked item flips it, which is required for it to cook
  * successfully instead of burning.
+ *
+ * <p>A grill can also hold its own campfire, mirroring the Forge original: placing it on a lit
+ * campfire (or right-clicking a campfire onto its side) sets {@link #HAS_CAMPFIRE}, which lights
+ * the block, swaps in the campfire model, heats the grill on its own, and returns the campfire
+ * when the grill is broken.</p>
  */
 public class GrillBlock extends BaseEntityBlock {
     public static final MapCodec<GrillBlock> CODEC = simpleCodec(GrillBlock::new);
 
     public static final EnumProperty<Direction> FACING = HorizontalDirectionalBlock.FACING;
+    /** True when a campfire is mounted in this block, matching the Forge original. */
+    public static final BooleanProperty HAS_CAMPFIRE = BooleanProperty.create("has_campfire");
     private static final VoxelShape SHAPE;
 
     public GrillBlock(Properties properties) {
         super(properties);
-        registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH));
+        registerDefaultState(this.stateDefinition.any()
+                .setValue(FACING, Direction.NORTH)
+                .setValue(HAS_CAMPFIRE, false));
     }
 
     @Override
@@ -81,6 +97,28 @@ public class GrillBlock extends BaseEntityBlock {
     }
 
     @Override
+    protected BlockState updateShape(BlockState state, LevelReader level, ScheduledTickAccess ticks, BlockPos pos,
+                                     Direction direction, BlockPos neighborPos, BlockState neighborState,
+                                     RandomSource random) {
+        if (direction == Direction.DOWN && !state.canSurvive(level, pos)) {
+            return Blocks.AIR.defaultBlockState();
+        }
+        return super.updateShape(state, level, ticks, pos, direction, neighborPos, neighborState, random);
+    }
+
+    /**
+     * A mounted campfire is returned when the grill is broken, matching the Forge original's
+     * loot table (which adds a campfire when {@code has_campfire} is set).
+     */
+    @Override
+    public BlockState playerWillDestroy(Level level, BlockPos pos, BlockState state, Player player) {
+        if (state.getValue(HAS_CAMPFIRE) && !level.isClientSide()) {
+            popResource(level, pos, new ItemStack(Items.CAMPFIRE));
+        }
+        return super.playerWillDestroy(level, pos, state, player);
+    }
+
+    @Override
     protected void affectNeighborsAfterRemoval(BlockState state, net.minecraft.server.level.ServerLevel level,
                                               BlockPos pos, boolean movedByPiston) {
         BlockEntity blockEntity = level.getBlockEntity(pos);
@@ -97,12 +135,39 @@ public class GrillBlock extends BaseEntityBlock {
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(FACING);
+        builder.add(FACING, HAS_CAMPFIRE);
     }
 
+    /**
+     * Placing a grill on a lit campfire mounts the campfire inside the grill, which is how the
+     * Forge original works. The placement position is the campfire's own position.
+     */
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
-        return this.defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
+        Level level = context.getLevel();
+        BlockPos pos = context.getClickedPos();
+        BlockState below = level.getBlockState(pos);
+        boolean campfire = below.is(Blocks.CAMPFIRE)
+                && below.getValue(BlockStateProperties.LIT)
+                && !below.getValue(BlockStateProperties.WATERLOGGED);
+
+        return this.defaultBlockState()
+                .setValue(FACING, context.getHorizontalDirection().getOpposite())
+                .setValue(HAS_CAMPFIRE, campfire);
+    }
+
+    /**
+     * A grill may stand on a sturdy surface, <em>or</em> on a lit campfire it is mounting. The
+     * vanilla check is still required for the normal case, because the grill is otherwise a
+     * regular placeable block.
+     */
+    @Override
+    protected boolean canSurvive(BlockState state, LevelReader level, BlockPos pos) {
+        BlockState below = level.getBlockState(pos.below());
+        if (below.is(Blocks.CAMPFIRE) && below.getValue(BlockStateProperties.LIT)) {
+            return true;
+        }
+        return Block.canSupportCenter(level, pos.below(), Direction.UP);
     }
 
     @Override
@@ -123,6 +188,22 @@ public class GrillBlock extends BaseEntityBlock {
      */
     private InteractionResult handleUse(Level level, BlockPos pos, net.minecraft.world.entity.player.Player player,
                                         InteractionHand hand, BlockHitResult hit, boolean sneaking) {
+        // Mounting a campfire onto a bare grill, as in the Forge original: right-click a grill
+        // that has no campfire yet, holding a campfire, aiming at any side face.
+        ItemStack heldInHand = player.getItemInHand(hand);
+        BlockState blockState = level.getBlockState(pos);
+        if (!blockState.getValue(HAS_CAMPFIRE)
+                && heldInHand.is(Items.CAMPFIRE)
+                && hit.getDirection().getAxis() != Direction.Axis.Y) {
+            if (!level.isClientSide()) {
+                level.setBlockAndUpdate(pos, blockState.setValue(HAS_CAMPFIRE, true));
+                if (!player.getAbilities().instabuild) {
+                    heldInHand.shrink(1);
+                }
+            }
+            return InteractionResult.SUCCESS;
+        }
+
         if (!(level.getBlockEntity(pos) instanceof GrillBlockEntity grill)) {
             return InteractionResult.PASS;
         }
@@ -136,6 +217,15 @@ public class GrillBlock extends BaseEntityBlock {
         ItemStack grillItems = grill.getItem(i);
 
         if (!sneaking) {
+            // Seasoning an item that is already cooking, as in the Forge original.
+            if (!grillItems.isEmpty()
+                    && stack.getItem() instanceof SeasoningItem seasoning
+                    && seasoning.canSprinkle(grillItems)) {
+                seasoning.sprinkle(grillItems, hit.getLocation(), player, stack);
+                grill.inventoryChanged();
+                return InteractionResult.SUCCESS;
+            }
+
             Optional<GrillingRecipe> optional = grill.findMatchingRecipe(stack);
             Optional<CampfireCookingRecipe> campfireOptional = grill.findMatchingCampfireRecipe(stack);
 

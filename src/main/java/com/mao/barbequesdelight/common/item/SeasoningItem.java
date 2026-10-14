@@ -19,14 +19,15 @@ import org.jetbrains.annotations.Nullable;
 import java.util.function.Consumer;
 
 /**
- * A seasoning powder or sauce. Carries 64 uses and applies its flavour to a skewer placed
- * on a Farmer's Delight cutting board.
+ * A seasoning powder or sauce. Powders carry 64 uses and sauces 16, matching the Forge
+ * original. Applying one writes its flavour onto a skewer and rewrites the skewer's food
+ * components; skewers can be seasoned on a Farmer's Delight cutting board or directly on a grill.
  */
 public class SeasoningItem extends Item {
     private final BBQDSeasoning seasoning;
 
     public SeasoningItem(Item.Properties properties, BBQDSeasoning seasoning) {
-        super(properties.durability(64));
+        super(properties.durability(seasoning.getUses()));
         this.seasoning = seasoning;
     }
 

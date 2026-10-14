@@ -16,8 +16,14 @@ import vectorwing.farmersdelight.common.registry.ModBlocks;
 import java.util.function.Function;
 
 public class BBQDBlocks {
+    /**
+     * The grill lights up when it holds a campfire, matching the Forge original. 26.1 makes light
+     * a construction-time property ({@code Properties.lightLevel}) rather than an overridable
+     * method, so it is declared here.
+     */
     public static final Block GRILL = register("grill",
-            props -> new GrillBlock(props), BlockBehaviour.Properties.ofLegacyCopy(ModBlocks.SKILLET.get()));
+            props -> new GrillBlock(props), BlockBehaviour.Properties.ofLegacyCopy(ModBlocks.SKILLET.get())
+                    .lightLevel(state -> state.getValue(GrillBlock.HAS_CAMPFIRE) ? 15 : 0));
 
     public static final Block INGREDIENTS_BASIN = register("ingredients_basin",
             props -> new IngredientsBasinBlock(props), BlockBehaviour.Properties.ofLegacyCopy(Blocks.OAK_PLANKS));
