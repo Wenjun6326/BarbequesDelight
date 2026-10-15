@@ -35,6 +35,8 @@ public class BarbequesDelight implements ModInitializer {
         BBQDRecipes.registerBBQDRecipes();
         BBQDEvents.registerBBQDEvents();
         BBQDEntityTypes.registerBBQDEntityTypes();
+        com.mao.barbequesdelight.common.network.BBQDNetworking.registerPayloads();
+        com.mao.barbequesdelight.common.network.BBQDNetworking.registerServerHandlers();
         CompostableRegistry.INSTANCE.add(BBQDItems.BURNT_FOOD, 0.2f);
 
         LOGGER.info("Barbeque's Delight is loaded");

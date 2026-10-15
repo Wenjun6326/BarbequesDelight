@@ -56,6 +56,24 @@ public final class BBQDRecipesHelper {
     }
 
     /**
+     * Every recipe the client currently knows about, or an empty list on a dedicated server.
+     *
+     * <p>Used by the JEI plugin, which needs the recipe list rather than a single match.</p>
+     */
+    public static java.util.Collection<RecipeHolder<?>> allClientRecipes() {
+        SynchronizedRecipes client = clientRecipes;
+        if (client == null) {
+            return java.util.List.of();
+        }
+        try {
+            return client.recipes();
+        } catch (Throwable t) {
+            LOGGER.debug("client recipe list unavailable", t);
+            return java.util.List.of();
+        }
+    }
+
+    /**
      * Looks up the first matching recipe on whichever side this is running: the server's
      * {@link RecipeManager} when available, otherwise the client's synchronised recipes.
      *

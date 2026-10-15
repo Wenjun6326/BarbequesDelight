@@ -71,29 +71,32 @@ public class TrayBlock extends BaseEntityBlock {
         return handleUse(level, pos, player, ItemStack.EMPTY);
     }
 
+    /**
+     * Insert or take, mirroring the Forge original's {@code StorageTile#insert} /
+     * {@code ClickStorageMethod#onClick} pair.
+     *
+     * <p>Sneaking means "one item", not sneaking means "the whole stack" - in both directions.
+     * An earlier version of this port had the take side inverted (sneaking took everything) and
+     * ignored the sneak flag entirely when inserting, so a held stack topped an existing slot up
+     * by one item instead of filling it.</p>
+     */
     private InteractionResult handleUse(Level level, BlockPos pos, Player player, ItemStack stack) {
         if (!(level.getBlockEntity(pos) instanceof TrayBlockEntity tray)) {
             return InteractionResult.PASS;
         }
 
+        boolean sneaking = player.isSecondaryUseActive();
+
         if (!stack.isEmpty()) {
-            for (int i = 0; i < tray.getContainerSize(); ++i) {
-                ItemStack itemStack = tray.getItem(i);
-                if (itemStack.isEmpty()) {
-                    tray.setItem(i, stack.split(stack.getCount()));
-                    return InteractionResult.SUCCESS;
-                }
-                if (ItemStack.isSameItemSameComponents(stack, itemStack)
-                        && itemStack.getCount() < itemStack.getMaxStackSize()) {
-                    itemStack.setCount(itemStack.getCount() + stack.split(1).getCount());
-                    return InteractionResult.SUCCESS;
-                }
+            if (tray.insert(level, stack, sneaking)) {
+                return InteractionResult.SUCCESS;
             }
-            tray.inventoryChanged();
-        } else if (tray.removeItems(player)) {
-            return InteractionResult.SUCCESS;
+            return InteractionResult.PASS;
         }
 
+        if (tray.take(player, sneaking)) {
+            return InteractionResult.SUCCESS;
+        }
         return InteractionResult.PASS;
     }
 

@@ -113,7 +113,11 @@ public class GrillBlockEntity extends SyncedBlockEntity implements BlockEntityIn
         for (int i = 0; i < items.size(); ++i) {
             if (grillingTimes[i] > 0) {
                 flag = true;
-                grillingTimes[i] = Mth.clamp(grillingTimes[i] - 2, 0, grillingTimesTotal[i]);
+                // Cooling down must be allowed to run all the way back to 0. The upper bound
+                // here is the current time, not the cooking duration: clamping to the duration
+                // (as this used to) left anything past it - burnt, or the already-flipped half -
+                // frozen in place once the heat was removed, so the grill never cooled.
+                grillingTimes[i] = Math.max(0, grillingTimes[i] - 2);
             }
         }
         if (flag) {
@@ -139,12 +143,40 @@ public class GrillBlockEntity extends SyncedBlockEntity implements BlockEntityIn
         return flipped[i];
     }
 
+    /** Elapsed grilling ticks for one half, as sent to the client. */
+    public int getCookingTime(int i) {
+        return grillingTimes[i];
+    }
+
+    /** Total grilling ticks for one half before it is done. */
+    public int getCookingTotalTime(int i) {
+        return grillingTimesTotal[i];
+    }
+
+    /**
+     * Whether this half is ready to be turned over.
+     *
+     * <p>This must answer on the client too: the Forge original has no side check here, and
+     * Jade asks the client-side block entity for its state. Gating on {@code !isClientSide()}
+     * made the client always report "not ready", so the flip prompt could never appear.</p>
+     *
+     * <p>The bounds check matters: {@code getSlotForHitting} answers with
+     * {@code getContainerSize()} when the crosshair is not on the top face, and the HUD hint
+     * feeds that straight in.</p>
+     */
     public boolean canFlip(int i) {
-        Level level = this.getLevel();
+        if (i < 0 || i >= grillingTimes.length) {
+            return false;
+        }
+        // A total of 0 means the duration is not known on this side yet (the client only learns
+        // it from the recipe, and recipe sync can lag the block entity). Without this guard
+        // "time >= total / 2" is "0 >= 0", so an unknown duration would look ready to flip.
+        if (grillingTimesTotal[i] <= 0) {
+            return false;
+        }
         return isBarbecuing()
                 && grillingTimes[i] >= (grillingTimesTotal[i] / 2)
-                && !getFlipped(i)
-                && level != null && !level.isClientSide();
+                && !getFlipped(i);
     }
 
     public static void tick(Level world, BlockPos blockPos, BlockState blockState, GrillBlockEntity grill) {

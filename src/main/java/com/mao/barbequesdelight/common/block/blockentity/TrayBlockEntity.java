@@ -46,16 +46,74 @@ public class TrayBlockEntity extends SyncedBlockEntity implements BlockEntityInv
         return offsets[index];
     }
 
-    /** Takes one item (or the whole stack when sneaking) from the highest occupied slot. */
-    public boolean removeItems(Player player) {
-        for (int i = getContainerSize() - 1; i >= 0; i--) {
-            ItemStack stack1 = getItem(i);
-            if (!stack1.isEmpty()) {
-                int count = player.isSecondaryUseActive() ? stack1.getCount() : 1;
-                player.getInventory().placeItemBackInInventory(stack1.split(count));
-                inventoryChanged();
-                return true;
+    /**
+     * Puts the held stack onto the tray, mirroring the Forge original's
+     * {@code StorageTile#insert}: an existing matching slot is topped up first, otherwise the
+     * first empty slot is used. {@code one} inserts a single item (sneaking) instead of the whole
+     * stack, and the amount is capped by the slot's remaining room.
+     *
+     * <p>Invoked for both hands on every right-click, so it must stay a no-op on the client:
+     * the server is the only side allowed to move items.</p>
+     *
+     * @return true when an item would be (or was) accepted, so the interaction predicts correctly
+     */
+    public boolean insert(Level level, ItemStack handStack, boolean one) {
+        if (handStack.isEmpty()) {
+            return false;
+        }
+
+        int target = -1;
+        for (int i = 0; i < getContainerSize(); i++) {
+            ItemStack slot = getItem(i);
+            if (slot.isEmpty()) {
+                if (target < 0) {
+                    target = i;
+                }
+            } else if (ItemStack.isSameItemSameComponents(slot, handStack)) {
+                target = i;
+                break;
             }
+        }
+        if (target < 0) {
+            return false;
+        }
+
+        ItemStack slot = getItem(target);
+        int room = handStack.getMaxStackSize() - slot.getCount();
+        int amount = Math.min(room, one ? 1 : handStack.getCount());
+        if (amount <= 0) {
+            return false;
+        }
+
+        if (!level.isClientSide()) {
+            ItemStack copy = handStack.split(amount);
+            copy.grow(slot.getCount());
+            setItem(target, copy);
+            inventoryChanged();
+        }
+        return true;
+    }
+
+    /**
+     * Takes from the highest occupied slot: a single item when sneaking, the whole stack
+     * otherwise - the Forge original's {@code split(isShiftKeyDown() ? 1 : getCount())}.
+     *
+     * @return true when something would be (or was) taken
+     */
+    public boolean take(Player player, boolean one) {
+        for (int i = getContainerSize() - 1; i >= 0; i--) {
+            ItemStack slot = getItem(i);
+            if (slot.isEmpty()) {
+                continue;
+            }
+
+            Level level = getLevel();
+            if (level == null || !level.isClientSide()) {
+                int amount = one ? 1 : slot.getCount();
+                player.getInventory().placeItemBackInInventory(slot.split(amount));
+                inventoryChanged();
+            }
+            return true;
         }
         return false;
     }
@@ -63,7 +121,7 @@ public class TrayBlockEntity extends SyncedBlockEntity implements BlockEntityInv
     public void inventoryChanged() {
         setChanged();
         Level level = this.getLevel();
-        if (level != null) {
+        if (level != null && !level.isClientSide()) {
             BlockState state = this.getBlockState();
             level.sendBlockUpdated(this.getBlockPos(), state, state, net.minecraft.world.level.block.Block.UPDATE_ALL);
         }

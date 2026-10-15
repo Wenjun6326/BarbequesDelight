@@ -1,19 +1,20 @@
 # Barbeque's Delight — Fabric port for Minecraft 26.1
 
-A port of **[Barbeque's Delight](https://modrinth.com/mod/barbeques-delight)** 1.1.0 — a
+A port of **[Barbeque's Delight](https://modrinth.com/mod/barbeques-delight)** — a
 [Farmer's Delight](https://modrinth.com/mod/farmers-delight) addon by
 **MaoMao (Aomiaomao)** — from Minecraft 1.20.1 / Fabric / Yarn to **Minecraft 26.1**.
 
-Port version: **`1.1.1` / `fabric+26.1mc`**
+Port version: **`2.0.1` / `fabric+26.1mc`**
 
 > **This is an unofficial port.** All credit for the mod, its design, art and gameplay goes to
 > the original author. See [Credits](#credits). The upstream repository is
 > [AOMIAOMAO/BarbequesDelight](https://github.com/AOMIAOMAO/BarbequesDelight); this fork adds the
-> 26.1 port, and brings the Fabric release up to parity with the author's
+> 26.1 port, and brings the Fabric release to parity with the author's
 > [Forge original](https://github.com/Minecraft-LightLand/BarbequesDelight).
 
-Gameplay, mechanics and textures follow 1.1.0, plus the two features the Forge original has and
-the Fabric release was missing — see [Forge parity](#forge-parity-what-this-port-adds).
+Gameplay, mechanics and textures follow the Forge original. The **Forge release is the
+reference** for behaviour, because the Fabric 1.1.0 release was missing features and shipped a
+few mechanics that did not work; this port implements what Forge does.
 
 ---
 
@@ -26,6 +27,8 @@ the Fabric release was missing — see [Forge parity](#forge-parity-what-this-po
 | Fabric API | any 26.1 build |
 | Java | 25 or newer |
 | **Farmer's Delight Refabricated** | **26.1-3.6.0 or newer — required, not bundled** |
+| Jade *(optional)* | any 26.1 build — adds grill tooltips |
+| JEI *(optional)* | any 26.1 build — adds the Grilling and Skewering pages |
 
 Farmer's Delight on Fabric for 26.1 is the **Refabricated** fork. It is a hard dependency and is
 **not** included in the release jar.
@@ -36,7 +39,8 @@ Farmer's Delight on Fabric for 26.1 is the **Refabricated** fork. It is a hard d
 2. Put [Fabric API](https://modrinth.com/mod/fabric-api) and
    [Farmer's Delight Refabricated](https://modrinth.com/mod/farmers-delight-refabricated) in `mods/`.
 3. Put the release jar from [Releases](../../releases) in `mods/`.
-4. Optionally add [REI](https://modrinth.com/mod/rei) to see the grilling and skewering recipes.
+4. Optionally add **Jade** (grill tooltips) and/or **JEI** (recipe pages). Both are soft
+   dependencies — the mod runs without them.
 
 One jar covers 26.1, 26.1.1 and 26.1.2.
 
@@ -61,21 +65,24 @@ would reject 26.1 and 26.1.1. Both ranges match what Farmer's Delight Refabricat
 
 Three blocks (grill, ingredients basin, tray), nine raw skewers, nine grilled skewers, six
 seasoning powders/sauces, `kebab_wrap`, `kebab_sandwich`, `bibimbap`, `burnt_food`, a butcher
-villager trade, a creative tab, and REI categories.
+villager trade, and a creative tab.
 
 ### Behaviour
 
 - **Grill** — two independent halves. Right-click an **empty** half with a valid ingredient to
-  place it. Sneak-click to **flip**; a flip is only accepted once the half is at least half
+  place it. **Sneak-right-click to flip**; a flip is only accepted once the half is at least half
   cooked. Flip it and it cooks into the recipe result; leave it and it becomes `burnt_food`.
-  Grilling recipes take priority over vanilla campfire recipes, which are used as a fallback
-  (`cookingTime - 200`). The grill must be **heated** — a heat source below it, or its own
-  mounted campfire (see below).
+  Grilling recipes take priority over vanilla campfire recipes, which are used as a fallback.
+  The grill must be **heated** — a heat source below it, or its own mounted campfire.
+
+  While a half is ready to be turned over, a **"sneak right click to flip" hint** appears under
+  the crosshair, and Jade shows per-half status (remaining time, *Ready to Flip!*, *Cooked!*,
+  *Burnt!!*). Remove the heat and progress **cools back down** towards raw.
 - **Ingredients basin** — two halves. Right-click with an ingredient to store it, then hold a
-  tool (a stick) in your main hand and an optional garnish in your off hand and right-click to
-  skewer.
+  tool (a stick) in your main hand with an optional garnish in your off hand and right-click to
+  skewer. JEI's *Skewering* page spells out the two-hand requirement.
 - **Tray** — three display slots, stackable up to three high; `support=true` only for the middle
-  tray of a three-high stack.
+  tray of a three-high stack. **Sneak = one item, otherwise the whole stack**, in both directions.
 - **Seasonings** — three powders (64 uses) and three sauces (16 uses). Seasoning a skewer
   rewrites its food effects:
   - **CUMIN** heals 2 when eaten
@@ -88,37 +95,37 @@ villager trade, a creative tab, and REI categories.
   Skewers can be seasoned on a Farmer's Delight **cutting board**, or directly on the **grill**
   while they are cooking.
 
+### Cooking times
+
+`grillingtime` in the recipe JSON is **per side**. `grilled_beef_skewer` is 360 ticks, so: place
+it, and from 180 ticks (9 s) it can be flipped; flip before 360 ticks or it becomes `burnt_food`.
+
 ---
 
-## Forge parity (what this port adds)
-
-The upstream Fabric release is missing two things its Forge sibling has. Both are implemented
-here, using the Forge original
-([Minecraft-LightLand/BarbequesDelight](https://github.com/Minecraft-LightLand/BarbequesDelight))
-as the reference.
-
-### The grill can hold a campfire
+## The grill can hold a campfire
 
 The Forge grill carries a `has_campfire` block state: it can be placed **on a lit campfire**, or
 a campfire can be **right-clicked onto the grill**. A mounted campfire:
 
 - lights the block (light level 15, like the Forge original),
-- renders the grill combined with a campfire model
-  (`block/grill_with_campfire.json`),
+- renders the grill combined with a campfire model (`block/grill_with_campfire.json`),
 - heats the grill on its own, so it cooks without any separate heat source,
-- is returned as an item when the grill is broken.
+- is returned as an item when the grill is broken (the loot table adds a campfire when
+  `has_campfire=true`).
 
 Rendering the campfire requires combining two models. The Forge original uses the Forge-only
 `forge:composite` model loader, which does not exist in vanilla, so the campfire geometry is
-**inlined** into `grill_with_campfire.json` instead. The model is byte-for-byte vanilla-format and
-needs no loader.
+**inlined** into `grill_with_campfire.json` instead. The model is plain vanilla format and needs
+no loader.
 
-### The three sauces are implemented
+---
 
-`honey_mustard_sauce`, `buffalo_sauce` and `barbeque_sauce` were registered by upstream but never
-given any assets, so they rendered as missing-texture placeholders named after their raw
-translation key. The Forge original has always had all six flavours in its seasoning enum and
-ships textures for the sauces, so this port completes them:
+## What the Forge original has that 1.1.0 was missing
+
+Beyond the campfire mount above, the Fabric 1.1.0 release registered three sauces but never gave
+them any assets, so they rendered as missing-texture placeholders named after their raw
+translation key. The Forge original has always had all six flavours and ships sauce textures, so
+this port completes them:
 
 - textures, item models and 26.1 client item definitions,
 - translation keys in all four languages (the Chinese names come from the Forge release:
@@ -130,8 +137,105 @@ ships textures for the sauces, so this port completes them:
 in the Forge original.
 
 **Note:** like the Forge original, the sauces have **no crafting recipe** — they are creative-mode
-items. This was confirmed against the Forge source and the Forge 1.0.6 release, neither of which
-contains a sauce recipe.
+items. This was confirmed against both the Forge source and the Forge 1.0.6 release.
+
+---
+
+## Mechanics fixed for 2.0.1
+
+Everything below was a real, reproducible difference from the Forge original or from 1.20.1.
+Each was found by comparing against the Forge source and 1.20.1 branch, then verified.
+
+### The grill never cooled down
+
+Heat loss ran the timer backwards, but the result was clamped to the *cooking duration* rather
+than to zero, so anything at or past that point — a flipped half — stayed frozen once the heat was
+removed. Now clamped to zero, matching `ItemEntry#tick` (`time -= 2; if (time <= 0) time = 0`).
+
+### Tray sneak behaviour was inverted
+
+`insert` ignored the sneak flag and always added a **single** item; `take` interpreted sneaking as
+"take the whole stack". The Forge original's `StorageTile#insert` / `ClickStorageMethod` mean the
+opposite: **sneak = one item, otherwise the whole stack**, for both inserting and taking. Both
+sides are now implemented to match, including the "top up a matching slot, otherwise use the first
+empty one" order and the stack-size cap.
+
+### The tray and basin changed inventories on the client
+
+Both moved items in `useItemOn`, which runs on **both** sides. The Forge original guards these with
+`if (!level.isClientSide())` and only assembles on the server. Without the guard the client both
+consumed ingredients and granted a result locally, so results appeared twice and the block showed
+stale contents until the next sync. All state changes now happen server-side only.
+
+### The grill would not mount a campfire
+
+`getStateForPlacement` read the block **at the placement position** while the variable was named
+`below` — so it only ever saw air, `has_campfire` stayed `false`, and the grill ended up one block
+above the fire with no fire of its own. It now reads the block underneath, and `GrillBlockItem`
+exists to match the Forge original's item class.
+
+### Client could not find this mod's recipes
+
+Fabric only synchronises recipes whose **serializer** has been declared for sync. Neither of this
+mod's serializers was, so the client received **zero** `barbequesdelight:grilling` recipes while
+the server had all nine. Every client-side recipe lookup then missed, and vanilla turns a missed
+block-interaction prediction into "send `ServerboundUseItemPacket` instead of
+`ServerboundUseItemOnPacket`" — so the server never saw the click at all.
+
+Symptoms were: placing a skewer played the sound but nothing appeared, and flipping did nothing.
+Both are fixed by registering the serializers with
+`RecipeSynchronization.synchronizeRecipeSerializer`.
+
+### Sneak-right-click never reached the grill
+
+Vanilla's `MultiPlayerGameMode.performUseItemOn` deliberately **skips the block interaction**
+when the player is sneaking *and* holding an item. That rule exists so sneaking with a block in
+hand places it instead of opening a chest; it also meant the grill never heard the click. (The
+Forge original is unaffected because Forge rewires the interaction path.)
+
+A client mixin (`GrillFlipMixin`) now intercepts that case and sends an explicit
+`FlipGrillPayload`, which the server validates (reach, grill present, half actually ready) and
+applies from its own state. The client predicts locally so the skewer turns immediately.
+
+### The flip prompt could never appear
+
+`canFlip` carried a `!level.isClientSide()` guard that the Forge original does not have, so the
+client always answered "not ready" — and the client is exactly who asks. It also treated an
+unknown duration as "ready" (`0 >= 0`). Both fixed, and the missing HUD hint was ported from the
+Forge original's `BBQOverlay` as `GrillFlipOverlay`.
+
+### Grilled items were invisible
+
+The item transform applied the vertical lift *after* rotating 90° about X, which maps local +Y onto
+world −Z — so `lift = 0.96` pushed items roughly a block out of the block instead of raising them
+onto the grate. The order now matches 1.20.1's renderer exactly: translate (including the lift),
+then rotate, then offset, then scale.
+
+### Tray textures were missing
+
+`blockstates/tray.json` pointed its `support=false` variants at
+`barbequesdelight:block/rice_roll_medley_block_leftover`, which does not exist, and the tray models
+referenced `farmersdelight:block/tray_top`, a sprite Farmer's Delight renamed to `tray`. Both tray
+models were also missing their `parent`. The original models were recovered from the upstream git
+history (`1.0.9-Preview`) and restored, using `farmersdelight:block/crate_bottom` as upstream does.
+
+### The grill model had missing textures
+
+Twelve `#missing` references, several on visible faces — including the leg tops and the grate rim —
+which rendered as the magenta/black checker. All now reference the existing `grill_side` and
+`grill_top` sprites.
+
+### JEI showed no recipes at all
+
+26.1 exposes recipes to viewers through `RecipeDisplay`, but JEI still needs a category to lay one
+out in, and this port had no JEI plugin. The recipes existed, synced, and produced displays — with
+nothing to claim them. `BBQDJeiPlugin` now registers a **Grilling** and a **Skewering** page, and
+because each page renders the recipe's own `RecipeDisplay`, it cannot drift from actual behaviour.
+
+Two follow-on problems were fixed with it: JEI distinguishes entries by `getIdentifier`, and
+`RecipeDisplay` carries no id, so all nine recipes of a type collapsed into a single page
+("1/1") — `JeiDisplayIds` now files each display under its recipe id. And the category captions used
+a doubled horizontal offset with slots starting only 1 px below the text, which overlapped.
 
 ---
 
@@ -139,10 +243,9 @@ contains a sauce recipe.
 
 Minecraft 26.1 is the first **unobfuscated** release: Yarn was discontinued and Mojang's official
 names are used, `ItemStack` can no longer be created before registries load, and several APIs the
-original relied on are gone. The notable adaptations, plus the fixes below, are listed here.
-Two of them were real bugs that made the mod unplayable; both are fixed.
+original relied on are gone.
 
-### Fixed: block items showed their raw translation key
+### Block items showed their raw translation key
 
 26.1 resolves an item's translation key **once**, in the `Item` constructor, from a
 `DependantName` that defaults to the `item.` prefix. `BlockItem`'s constructor no longer switches
@@ -153,38 +256,24 @@ Without that call the grill, basin and tray rendered as `item.barbequesdelight.g
 creative tab and inventory tooltips. Jade kept working throughout, because it reads the *block's*
 name (`block.barbequesdelight.grill`) instead of the item's.
 
-### Fixed: crash when right-clicking a grill or basin (`ClassCastException`)
+### Crash when right-clicking a grill or basin (`ClassCastException`)
 
 26.1 moved recipe lookup onto `ServerLevel.recipeAccess()`, which returns a `RecipeManager`. A
 `ClientLevel` has **no reachable `RecipeManager`** — `ClientRecipeContainer` implements only the
 narrower `RecipeAccess` interface, and `ClientLevel.getConnection()` is private.
 
-This matters because block interactions (`useItemOn` / `useWithoutItem`) run on **both** sides:
-the client runs them first to predict the result. The 1.20.1 original matched recipes on either
-side because `World.getRecipeManager()` existed on both, so a direct port that cast
-`(ServerLevel) level` threw `ClassCastException` and hard-crashed the game the moment a player
-right-clicked a grill or basin — for example with flint and steel.
+This matters because block interactions run on **both** sides: the client runs them first to
+predict the result. The 1.20.1 original matched recipes on either side because
+`World.getRecipeManager()` existed on both, so a direct port that cast `(ServerLevel) level`
+hard-crashed the game the moment a player right-clicked a grill or basin.
 
 All lookups now go through `common/util/BBQDRecipesHelper`.
-
-### Fixed: client could no longer predict recipe-based interactions
-
-Fixing only the crash left a subtler problem: with no `RecipeManager` on the client, **every**
-recipe-dependent interaction answered `PASS` client-side. The server still performed the action
-(it always re-runs the interaction authoritatively), but the client stopped predicting placing an
-item on the grill or skewering in the basin — a regression against 1.20.1.
-
-The client recipe source is restored through Fabric API's `ClientRecipeSynchronizedEvent`: the
-synced `SynchronizedRecipes` is stored and used on the client, falling back to the server's
-`RecipeManager` when available. Both sides reach the same answer, so prediction matches the
-authoritative result. The client branch is wrapped defensively — it is only prediction, so any
-throwable degrades to "no match" rather than breaking the interaction.
 
 ### Other API adaptations
 
 - Yarn → Mojang names throughout; `net.minecraft.resources.Identifier` (no public constructor).
-- `FoodProperties` moved to `net.minecraft.world.food` and lost `statusEffect`; status effects now
-  live on the `minecraft:consumable` component as `ApplyStatusEffectsConsumeEffect`.
+- `FoodProperties` is a record in `net.minecraft.world.food`; status effects live on the
+  `minecraft:consumable` component as `ApplyStatusEffectsConsumeEffect`.
 - Item flavour data moved from raw NBT to the `minecraft:custom_data` component (same `seasoning`
   key).
 - Recipes rewritten for 26.1: `RecipeInput`/`assemble`, `ItemStackTemplate` results,
@@ -200,45 +289,50 @@ throwable degrades to "no match" rather than breaking the interaction.
   kept verbatim for save compatibility.
 - Block entity renderers use the new `createRenderState`/`extractRenderState`/`submit` split
   (`ItemRenderer` and `RenderType.cutout()` no longer exist; terrain layering is automatic).
-- Optional integrations: **REI** is included (categories + workstations). **EMI** had to be
-  dropped — it has no 26.1 build, and it is a soft dependency with no gameplay impact. **Jade** was
-  not ported for the same reason it adds only tooltips.
+- Optional integrations: **Jade** and **JEI** are both implemented as soft dependencies. **EMI**
+  was dropped — it has no 26.1 build, and no gameplay depends on it.
 
 ---
 
 ## Verification
 
-Verified against a running dedicated server and, where noted, a real client.
+Verified against a running dedicated server, a development client, and a real modpack instance
+(215 mods) where noted.
 
 | Check | Result |
 |---|---|
 | Dedicated server start (26.1 and 26.1.2) | 1855 recipes loaded, no parse errors |
-| Grill placed **on a lit campfire** | `canSurvive=true`; block entity created |
-| Grill on a campfire is heated | `isHeated=true` **without any other heat source** |
-| Right-click a campfire onto a bare grill | `has_campfire` becomes `true`, held campfire consumed, grill becomes heated |
-| Basin ← item, then empty hand | stored in a half, taken back out |
-| Tray ← item | stored in slot 0 |
-| Grill ← raw skewer (cold and on a campfire) | placed in a half; only the heated one cooks |
-| Flip timing | refused before the half-way point, accepted after; result `grilled_beef_skewer` |
-| No flip | burns into `burnt_food` |
+| Client recipe sync | all nine grilling and nine skewering recipes present client-side |
+| Grill placed **on a lit campfire** | mounts the campfire: `has_campfire=true`, light level 15 |
+| Right-click a campfire onto a bare grill | `has_campfire` becomes `true`, held campfire consumed |
+| Grill with a mounted campfire is heated | `isHeated=true` **without any other heat source** |
+| Breaking a grill with a campfire | drops both the grill and the campfire |
+| Grill **cools** when heat is removed | progress returns to 0 (was frozen before 2.0.1) |
+| Grill ← raw skewer | `Success`; the client sees `items=[1 beef_skewer]`, `total=[360,0]` |
+| Flip timing | `canFlip` false before half-way, true after; flip applies on the server |
+| **Skewer renders on the grate** | visible in-game (was pushed outside the block before 2.0.1) |
+| **Sneak-right-click flips** | flips, item turns 180° |
+| Flip hint under the crosshair | appears while a half is ready |
+| Jade tooltip | per-half item and status: remaining time / *Ready to Flip!* / *Cooked!* / *Burnt!!* |
+| Tray insert, not sneaking | whole stack, capped by remaining room |
+| Tray insert, sneaking | exactly one item |
+| Tray take, not sneaking | whole stack |
+| Tray take, sneaking | exactly one item |
+| Tray and basin on the client | no local inventory mutation |
 | Skewering a real recipe (mushroom + beef + stick) | produces `beef_skewer`, consumes ingredient, garnish and tool |
-| Seasoning an item **while it is on the grill** | flavour is applied (`flavour=BUFFALO`) |
+| Seasoning an item **while it is on the grill** | flavour is applied |
 | Sauce / powder durability | sauces `maxDamage=16`, powders `maxDamage=64` |
 | Seasoning effect changes | HONEY_MUSTARD 1200→600 ticks at chance 0.5→1.0; BUFFALO 600 ticks at amplifier +1; BARBEQUE 1200→2400 ticks; CHILLI `alwaysEat=true`; PEPPER 1.6s→0.8s |
+| JEI plugin | loads; registers 9 grilling and 9 skewering entries under distinct ids |
 | Flint & steel on a grill | no crash |
-| Client interaction path | no crash; `useItemOn` reaches the block on a `ClientLevel` |
+| Models | no "missing model" or "missing texture" warnings for this mod |
 
 ### Not verified
 
-- The **client recipe prediction fix** (the `ClientRecipeSynchronizedEvent` integration) and the
-  **campfire grill's rendering** could not be confirmed on a live client: the build machine's dev
-  client stopped completing startup (it hangs after the texture atlases, render thread spinning, no
-  crash report — reproducible across five runs and unrelated to this mod, since the probes were
-  never reached). Everything in the table above was verified server-side, including the model
-  files being valid JSON with the expected 16 elements.
-- The `grill_with_campfire.json` model has not been seen rendered in-game. It is built from the
-  vanilla campfire template's own geometry (extracted from the 26.1 client jar) combined with this
-  mod's grill elements, so it should be correct, but please report anything odd.
+- The **JEI page layout** (caption placement, slot spacing) has not been seen rendered — only
+  confirmed to load with the right entry counts and unique ids. Please report overlaps.
+- The **`grill_with_campfire` model** has been confirmed to load without warnings and the block
+  state is correct; its rendered appearance has not been screenshotted.
 
 If you hit a client-only problem, please open an issue.
 
@@ -246,37 +340,20 @@ If you hit a client-only problem, please open an issue.
 
 ## Notes carried over from upstream
 
-These are pre-existing upstream behaviours, reproduced faithfully rather than fixed. The goal is a
-faithful port, not a fork. **Nothing here was "repaired" on purpose** — the one exception is the
-three sauces and the campfire grill, which are described under
-[Forge parity](#forge-parity-what-this-port-adds).
-
-### Tray consumes the whole held stack
-
-`TrayBlock.handleUse` stores via `tray.setItem(i, stack.split(stack.getCount()))`, while
-`BlockEntityInv.setItem` truncates what it stores to a single item. Right-clicking a tray with a
-stack therefore stores 1 item and discards the rest. Present verbatim in 1.20.1
-(`TrayBlock.java:45` + `BlockEntityInv.setStack`), so it was left alone.
+These are pre-existing upstream behaviours, reproduced faithfully. The goal is a faithful port,
+not a fork.
 
 ### Flint & steel removes the item from the targeted grill half
 
 Using an item that does not match a grilling recipe on an **occupied** half takes that item back
 into the player's inventory and returns success — it does not fall through to the item's own use.
-This is exactly what `GrillBlock#onUse` does in 1.20.1 (`GrillBlock.java:125`).
+This is exactly what `GrillBlock#onUse` does in 1.20.1.
 
 ### The basin's halves are addressed "crossed"
 
 Aiming at the visually left half resolves to slot 1 and the visually right half to slot 0. The
 mapping formula is copied verbatim from `BlockEntityInv#getSlotForHitting` in 1.20.1, and both
 halves behave identically, so this is cosmetic.
-
-### Other upstream issues
-
-- `models/block/tray.json` does not exist and `blockstates/tray.json` has `support=false` variants
-  pointing at unrelated/missing Farmer's Delight models.
-- The grill model has an unresolved `#missing` texture reference.
-- `ko_kr.json` was missing `block.barbequesdelight.tray`. One line was added to this port
-  (`"쟁반"`); it is a pure asset addition.
 
 ---
 
@@ -292,7 +369,7 @@ halves behave identically, so this is cosmetic.
 
 `libs/compile` and `libs/runtime` hold vendored non-Maven dependencies. **They are not committed**
 — they are other people's binaries. See [`libs/README.md`](libs/README.md) for exactly what to
-download and where to put it. Farmer's Delight Refabricated is required; REI, Jade and
+download and where to put it. Farmer's Delight Refabricated is required; JEI, Jade and
 Architectury are optional.
 
 These jars are `compileOnly`/`localRuntime` only and are **never bundled** into the output jar.

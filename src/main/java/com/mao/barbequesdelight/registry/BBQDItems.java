@@ -25,7 +25,8 @@ public class BBQDItems {
     private static final List<Item> TAB_ORDER = new ArrayList<>();
 
     public static final Item GRILL = register("grill",
-            props -> new BlockItem(BBQDBlocks.GRILL, props), blockItemProps());
+            props -> new com.mao.barbequesdelight.common.item.GrillBlockItem(BBQDBlocks.GRILL, props),
+            blockItemProps());
 
     public static final Item INGREDIENTS_BASIN = register("ingredients_basin",
             props -> new BlockItem(BBQDBlocks.INGREDIENTS_BASIN, props), blockItemProps());

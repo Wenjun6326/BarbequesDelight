@@ -139,14 +139,20 @@ public class GrillBlock extends BaseEntityBlock {
     }
 
     /**
-     * Placing a grill on a lit campfire mounts the campfire inside the grill, which is how the
-     * Forge original works. The placement position is the campfire's own position.
+     * Placing a grill on top of a lit campfire mounts that campfire inside the grill, which is
+     * the behaviour of the Forge original.
+     *
+     * <p>The grill occupies the block above the campfire; the block underneath is what decides
+     * this. The Forge version instead replaced the campfire's own position via
+     * {@code BlockPlaceContext#replaceClicked}, but that field is {@code protected} in 26.1 and
+     * vanilla has already resolved the target position by then, so overriding it there only
+     * shifted the grill up a block.</p>
      */
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
         Level level = context.getLevel();
         BlockPos pos = context.getClickedPos();
-        BlockState below = level.getBlockState(pos);
+        BlockState below = level.getBlockState(pos.below());
         boolean campfire = below.is(Blocks.CAMPFIRE)
                 && below.getValue(BlockStateProperties.LIT)
                 && !below.getValue(BlockStateProperties.WATERLOGGED);
@@ -192,9 +198,13 @@ public class GrillBlock extends BaseEntityBlock {
         // that has no campfire yet, holding a campfire, aiming at any side face.
         ItemStack heldInHand = player.getItemInHand(hand);
         BlockState blockState = level.getBlockState(pos);
-        if (!blockState.getValue(HAS_CAMPFIRE)
-                && heldInHand.is(Items.CAMPFIRE)
-                && hit.getDirection().getAxis() != Direction.Axis.Y) {
+        // Mounting a campfire onto a bare grill.
+        //
+        // The Forge original additionally required aiming at a side face
+        // (hit.getDirection().getAxis() != Y), which is unusable in practice: the grill's grate
+        // covers the top of the block, so that is where the player's crosshair lands. That
+        // restriction is deliberately dropped here so any face works.
+        if (!blockState.getValue(HAS_CAMPFIRE) && heldInHand.is(Items.CAMPFIRE)) {
             if (!level.isClientSide()) {
                 level.setBlockAndUpdate(pos, blockState.setValue(HAS_CAMPFIRE, true));
                 if (!player.getAbilities().instabuild) {
@@ -209,6 +219,7 @@ public class GrillBlock extends BaseEntityBlock {
         }
 
         int i = grill.getSlotForHitting(hit, level);
+
         if (i >= grill.getContainerSize()) {
             return InteractionResult.PASS;
         }
@@ -229,7 +240,16 @@ public class GrillBlock extends BaseEntityBlock {
             Optional<GrillingRecipe> optional = grill.findMatchingRecipe(stack);
             Optional<CampfireCookingRecipe> campfireOptional = grill.findMatchingCampfireRecipe(stack);
 
-            if (!stack.isEmpty() && grillItems.isEmpty() && (optional.isPresent() || campfireOptional.isPresent())) {
+            // On the client the recipe lookup is only a prediction aid. If it comes back empty
+            // we must NOT bail out with PASS: vanilla turns a PASS prediction into "send
+            // ServerboundUseItemPacket instead of ServerboundUseItemOnPacket", so the server
+            // never sees the block interaction at all and the item can never be placed. The
+            // server re-derives the recipe from its own authoritative data, so predicting
+            // "something goes on the grill" here is safe - if the item truly has no recipe the
+            // server rejects it and the client is corrected by the normal block update.
+            boolean clientCannotTell = level.isClientSide() && optional.isEmpty() && campfireOptional.isEmpty();
+            if (!stack.isEmpty() && grillItems.isEmpty()
+                    && (optional.isPresent() || campfireOptional.isPresent() || clientCannotTell)) {
                 grill.setItem(i, stack.split(1));
 
                 optional.ifPresent(recipe -> grill.setBarbecuing(i, recipe.getGrillingTime()));
@@ -237,7 +257,14 @@ public class GrillBlock extends BaseEntityBlock {
 
                 level.playSound(null, pos, SoundEvents.LANTERN_PLACE, SoundSource.BLOCKS, 0.7F, 1.0F);
                 return InteractionResult.SUCCESS;
-            } else if (!grillItems.isEmpty()) {
+            } else if (!grillItems.isEmpty() && stack.isEmpty()) {
+                // Taking the cooked item back only makes sense with an empty hand.
+                //
+                // The vanilla pipeline calls this for the main hand AND the off hand on every
+                // right-click, so without the stack.isEmpty() guard an occupied off hand (a
+                // shield, a totem, a torch) would immediately pull back whatever the main hand
+                // had just placed: the placement sound plays, yet the item never stays on the
+                // grill. That is exactly the reported "hear the sound, nothing is placed" bug.
                 player.getInventory().placeItemBackInInventory(grillItems.split(1));
                 grill.inventoryChanged();
                 return InteractionResult.SUCCESS;

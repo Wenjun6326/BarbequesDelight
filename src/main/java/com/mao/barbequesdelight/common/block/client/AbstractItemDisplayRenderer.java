@@ -134,13 +134,16 @@ public abstract class AbstractItemDisplayRenderer<T extends BlockEntity & BlockE
                 }
                 poseStack.mulPose(com.mojang.math.Axis.YP.rotationDegrees(state.facingYaw));
             } else {
-                float x = state.facingAxis == Direction.Axis.X ? 0.5F : 0.5F;
-                poseStack.translate(x, 0.0, 0.5);
+                // Mirrors the working 1.20.1 renderer exactly:
+                //   translate(0.5, 0.96, 0.5) -> rotate Y -> rotate X(90) -> offset -> scale
+                // The lift belongs to the initial WORLD-space translation, before any rotation.
+                // Applying it after the X rotation (as this code used to) maps the local Y axis
+                // onto world -Z, pushing the item out of the block instead of onto the grate.
+                poseStack.translate(0.5F, entry.lift, 0.5F);
                 poseStack.mulPose(com.mojang.math.Axis.YP.rotationDegrees(state.facingYaw));
                 if (entry.flat) {
                     poseStack.mulPose(com.mojang.math.Axis.XP.rotationDegrees(90.0F));
                 }
-                poseStack.translate(0.0, entry.lift, 0.0);
             }
 
             poseStack.translate(entry.offsetX, entry.offsetY, 0.0);

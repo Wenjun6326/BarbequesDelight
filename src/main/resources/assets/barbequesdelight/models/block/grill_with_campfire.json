@@ -64,7 +64,7 @@
             1,
             1
           ],
-          "texture": "#missing"
+          "texture": "#1"
         },
         "down": {
           "uv": [
@@ -132,7 +132,7 @@
             1,
             1
           ],
-          "texture": "#missing"
+          "texture": "#1"
         },
         "down": {
           "uv": [
@@ -200,7 +200,7 @@
             2,
             2
           ],
-          "texture": "#missing"
+          "texture": "#1"
         },
         "down": {
           "uv": [
@@ -268,7 +268,7 @@
             2,
             2
           ],
-          "texture": "#missing"
+          "texture": "#1"
         },
         "down": {
           "uv": [
@@ -436,7 +436,7 @@
             2,
             5
           ],
-          "texture": "#missing"
+          "texture": "#0"
         },
         "east": {
           "uv": [
@@ -454,7 +454,7 @@
             2,
             5
           ],
-          "texture": "#missing"
+          "texture": "#0"
         },
         "west": {
           "uv": [
@@ -504,7 +504,7 @@
             1,
             6
           ],
-          "texture": "#missing"
+          "texture": "#0"
         },
         "east": {
           "uv": [
@@ -522,7 +522,7 @@
             1,
             6
           ],
-          "texture": "#missing"
+          "texture": "#0"
         },
         "west": {
           "uv": [
@@ -572,7 +572,7 @@
             14,
             0
           ],
-          "texture": "#missing"
+          "texture": "#0"
         },
         "east": {
           "uv": [
@@ -581,7 +581,7 @@
             14,
             0
           ],
-          "texture": "#missing"
+          "texture": "#0"
         },
         "south": {
           "uv": [
@@ -590,7 +590,7 @@
             14,
             0
           ],
-          "texture": "#missing"
+          "texture": "#0"
         },
         "west": {
           "uv": [
@@ -599,7 +599,7 @@
             14,
             0
           ],
-          "texture": "#missing"
+          "texture": "#0"
         },
         "up": {
           "uv": [

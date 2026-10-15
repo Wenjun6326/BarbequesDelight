@@ -59,30 +59,38 @@ public class IngredientsBasinBlockEntity extends SyncedBlockEntity implements Bl
 
         SkeweringRecipeInput input = new SkeweringRecipeInput(basin, garnish, tool);
 
-        // Resolved on both sides: the server uses its RecipeManager, the client uses the recipes
-        // Fabric API synchronised to it. Matching on the client is what makes the interaction
-        // predict correctly instead of always returning PASS.
+        // Matching runs on both sides: the server uses its RecipeManager, the client uses the
+        // recipes Fabric API synchronised to it, so the prediction agrees with the server.
         var optional = BBQDRecipesHelper.find(level, BBQDRecipes.SKEWERING_TYPE, input);
         if (optional.isEmpty()) {
             return false;
         }
 
+        // Everything below mutates inventories, so it must run on the server only. The Forge
+        // original had the same split (it returned early on the client, before assembling).
+        // Consuming on the client as well made the result appear twice - once from the local
+        // prediction and again from the server's authoritative update - and left the basin
+        // showing stale contents until the next sync.
+        if (level.isClientSide()) {
+            return true;
+        }
+
         SkeweringRecipe recipe = optional.get().value();
         ItemStack result = recipe.assemble(input);
 
-        // Consume one tool and `count` of each non-empty ingredient slot, mirroring the
-        // original in-recipe consumption.
+        // One tool per craft, and `count` of each ingredient slot the recipe matched.
         tool.shrink(1);
         int count = recipe.getIngredientCount();
         if (!basin.isEmpty() && recipe.getIngredientList().stream().anyMatch(i -> i.test(basin))) {
-            basin.shrink(count);
+            basin.shrink(Math.min(count, basin.getCount()));
         }
         if (!garnish.isEmpty() && recipe.getIngredientList().stream().anyMatch(i -> i.test(garnish))) {
-            garnish.shrink(count);
+            garnish.shrink(Math.min(count, garnish.getCount()));
         }
 
-        ItemStack held = user.getItemInHand(hand);
-        if (held.isEmpty()) {
+        // The tool was just decremented in place, so re-read the hand rather than reusing the
+        // stale reference: the original put the result into an emptied hand.
+        if (user.getItemInHand(hand).isEmpty()) {
             user.setItemInHand(hand, result);
         } else {
             user.getInventory().placeItemBackInInventory(result);

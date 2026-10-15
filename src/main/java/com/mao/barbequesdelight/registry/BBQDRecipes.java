@@ -57,7 +57,18 @@ public class BBQDRecipes {
     }
 
     public static void registerBBQDRecipes() {
-        // Types, serializers and recipe book categories are registered by static init.
+        // Custom recipe serializers are NOT synchronised to the client by default. Fabric
+        // negotiates which serializers each side understands and only sends recipes whose
+        // serializer was declared here. Without this the client ends up with zero
+        // barbequesdelight:grilling recipes while the server has all of them, so every
+        // client-side recipe lookup misses. Vanilla turns a missed block-interaction prediction
+        // into "send ServerboundUseItemPacket instead of ServerboundUseItemOnPacket", so the
+        // server never even sees the click: items cannot be placed and nothing can be flipped.
+        net.fabricmc.fabric.api.recipe.v1.sync.RecipeSynchronization
+                .synchronizeRecipeSerializer(GRILLING_SERIALIZER);
+        net.fabricmc.fabric.api.recipe.v1.sync.RecipeSynchronization
+                .synchronizeRecipeSerializer(SKEWERING_SERIALIZER);
+
         BarbequesDelight.LOGGER.debug("Register BBQD Recipes For" + BarbequesDelight.MODID);
     }
 }

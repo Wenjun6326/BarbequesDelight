@@ -15,12 +15,21 @@
   "license": "MIT",
   "icon": "assets/barbequesdelight/icon.png",
   "environment": "*",
+  "mixins": [
+    "barbequesdelight.mixins.json"
+  ],
   "entrypoints": {
     "client": [
       "com.mao.barbequesdelight.BarbequesDelightClient"
     ],
     "main": [
       "com.mao.barbequesdelight.BarbequesDelight"
+    ],
+    "jade": [
+      "com.mao.barbequesdelight.compat.jade.GrillJadePlugin"
+    ],
+    "jei_mod_plugin": [
+      "com.mao.barbequesdelight.compat.jei.BBQDJeiPlugin"
     ]
   },
   "depends": {
@@ -29,5 +38,9 @@
     "minecraft": "~26.1",
     "java": ">=25",
     "farmersdelight": ">=26.1-3.6.0"
+  },
+  "suggests": {
+    "jade": "*",
+    "jei": "*"
   }
 }
